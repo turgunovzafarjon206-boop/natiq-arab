@@ -7,6 +7,7 @@ const { createArabBot, normCode } = require('./bot');
 const { createServer } = require('./index');
 
 const TOKEN = '777000:ARAB_TEST_TOKEN';
+let BIG_FAKE = null;
 let fails = 0; const ok = (name, cond, got) => { if (cond) console.log('  ✓ ' + name); else { fails++; console.log('  ✗ ' + name + (got !== undefined ? '  got: ' + JSON.stringify(got) : '')); } };
 const Q = (q, opts, a, x = {}) => Object.assign({ q, opts, a }, x);
 
@@ -245,6 +246,53 @@ async function botTests(store) {
     ok('kechasi (23:00) yuborilmaydi', (await late.processReminders()) === 0);
     await store.del('ar_prog', 'A7K3P9');
   }
+
+  // admin: bot orqali media yuklash (saytda «📲 Bot» → #raqam)
+  {
+    await store.put('ar_media', '7', { kind: 'audio', label: 'Bā · Talaffuz · 1-karta', status: 'wait' });
+    await store.put('ar_media', '8', { kind: 'video', label: 'Bā · Video dars', status: 'wait' });
+    await store.patch('ar_cfg', 'main', { mediaAdmins: '555' });
+    const A2 = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app', adminIds: ['999'], fetchImpl: async url => ({ ok: /file\/bot777000:ARAB_TEST_TOKEN\/voice\/f1\.oga$/.test(url), status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer }),
+      botOpts: { botInfo: { id: 7, is_bot: true, first_name: 'N', username: 'natiq_arab_bot', can_join_groups: false, can_read_all_group_messages: false, supports_inline_queries: false } } });
+    const C3 = []; A2.bot.api.config.use(async (prev, method, payload) => { C3.push({ method, payload: JSON.parse(JSON.stringify(payload || {})) });
+      return { ok: true, result: method === 'getFile' ? { file_id: 'F', file_unique_id: 'u', file_path: 'voice/f1.oga' } : method === 'answerCallbackQuery' ? true : { message_id: 1, date: 0, chat: { id: 555, type: 'private' } } }; });
+    const ADM = user(555, 'Admin'), STR = user(777, 'Begona');
+    const L3 = () => C3[C3.length - 1];
+    await A2.bot.handleUpdate(txt(ADM, '/start'));
+    ok('admin /start → «📤 Media yuklash» tugmasi', C3.some(c => c.payload.reply_markup && c.payload.reply_markup.keyboard && c.payload.reply_markup.keyboard[0][0].text === '📤 Media yuklash'));
+    await A2.bot.handleUpdate(txt(ADM, '📤 Media yuklash'));
+    ok('kutilayotgan raqamlar roʻyxati', L3().payload.reply_markup.inline_keyboard.length === 2 && /#8/.test(L3().payload.reply_markup.inline_keyboard[0][0].text), L3().payload);
+    await A2.bot.handleUpdate({ update_id: uid++, callback_query: { id: 'q1', from: ADM, chat_instance: 'x', data: 'ms:7', message: { message_id: 3, date: 0, chat: { id: 555, type: 'private' } } } });
+    ok('raqam tanlandi → «audio yoki ovozli xabar yuboring»', /#7/.test(L3().payload.text) && /ovozli xabar/.test(L3().payload.text), L3().payload.text);
+    await A2.bot.handleUpdate(msg(ADM, { video: { file_id: 'V', file_unique_id: 'v', width: 1, height: 1, duration: 1, file_size: 100 } }));
+    ok('notoʻgʻri tur rad etiladi', /kerak/.test(L3().payload.text));
+    await A2.bot.handleUpdate(msg(ADM, { voice: { file_id: 'F', file_unique_id: 'u', duration: 2, mime_type: 'audio/ogg', file_size: 4 } }));
+    const md = await store.get('ar_media', '7');
+    ok('ovozli xabar yuklandi va saqlandi', md.status === 'ready' && /\/arab\/tg\/7-\d+\.ogg$/.test(md.url) && md.src === 'voice' && store.files['arab/' + md.path], md);
+    ok('admin raqamni yozsa ham tanlanadi', await (async () => { await A2.bot.handleUpdate(txt(ADM, '#8')); return /#8/.test(C3.filter(c => c.method === 'sendMessage').pop().payload.text); })());
+
+    // katta fayl (>20 MB): MTProto bilan — Telegramda qoladi, /m/N orqali oqim
+    {
+      const FAKE = Buffer.from('0123456789abcdefghij'.repeat(10));
+      const big = { media: async id => ({ id }), sizeOf: () => FAKE.length, async *range(id, a, b) { yield FAKE.subarray(a, b + 1); } };
+      await store.put('ar_media', '9', { kind: 'video', label: 'Katta video', status: 'wait' });
+      const A3 = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app', adminIds: ['999'], big, botOpts: A2.bot.botInfo ? { botInfo: A2.bot.botInfo } : undefined });
+      const C4 = []; A3.bot.api.config.use(async (prev, method, payload) => { C4.push({ method, payload: JSON.parse(JSON.stringify(payload || {})) }); return { ok: true, result: { message_id: 1, date: 0, chat: { id: 999, type: 'private' } } }; });
+      const ENV = user(999, 'Env');
+      await A3.bot.handleUpdate(txt(ENV, '9'));
+      ok('katta fayl: «hajmi cheklanmagan»', /hajmi cheklanmagan/.test(C4[C4.length - 1].payload.text));
+      await A3.bot.handleUpdate(msg(ENV, { video: { file_id: 'BIG', file_unique_id: 'b', width: 1, height: 1, duration: 60, mime_type: 'video/mp4', file_size: 300 * 1048576 } }));
+      const bm = await store.get('ar_media', '9');
+      ok('300 MB video qabul qilindi (Telegramda, /m/9)', bm.status === 'ready' && bm.url === 'https://arab.example/m/9' && bm.big && bm.msgId, bm);
+      await store.put('ar_media', '10', { kind: 'video', label: 'Yana', status: 'wait' });
+      await A2.bot.handleUpdate(txt(ADM, '10')); await A2.bot.handleUpdate(msg(ADM, { video: { file_id: 'B2', file_unique_id: 'b2', width: 1, height: 1, duration: 60, file_size: 30 * 1048576 } }));
+      ok('MTProto sozlanmagan boʻlsa — tushuntirish', /TG_API_ID/.test(C3[C3.length - 1].payload.text));
+      await store.put('ar_media', '9', Object.assign(bm, { size: FAKE.length }));
+      BIG_FAKE = big;
+    }
+    await A2.bot.handleUpdate(txt(STR, '/media')); ok('begona odamga media yoʻq', /faqat adminlar/.test(L3().payload.text));
+    ok('ADMIN_IDS orqali ham admin', await (async () => { await A2.bot.handleUpdate(txt(user(999, 'Env'), '/media')); return /Qaysi raqamga/.test(L3().payload.text); })());
+  }
   await notifyOrder({ productName: 'Kitob', price: 10, name: 'Aziza', code: 'A7K3P9', phone: '+998901234567' });
   ok('operatorga buyurtma xabari', sent('sendMessage').some(c => c.payload.chat_id === '-100500' && /Yangi buyurtma/.test(c.payload.text)));
 }
@@ -254,7 +302,7 @@ async function apiTests(store) {
   console.log('Mini App API');
   const orders = [];
   const api = createApi({ store, token: TOKEN, onOrder: async o => orders.push(o) });
-  const srv = createServer({ api, appHtml: () => '<html>app</html>' }); await new Promise(r => srv.listen(0, r));
+  const srv = createServer({ api, store, big: BIG_FAKE, appHtml: () => '<html>app</html>' }); await new Promise(r => srv.listen(0, r));
   const port = srv.address().port;
   const call = (name, body, initData) => new Promise((res, rej) => {
     const data = JSON.stringify(Object.assign({ initData }, body || {}));
@@ -267,7 +315,13 @@ async function apiTests(store) {
   ok('initData tekshiruvi', verifyInitData(ID1, TOKEN).id === 111 && !verifyInitData(ID1, 'boshqa:token') && !verifyInitData(ID1.replace('Aziza', 'Hacker'), TOKEN));
   ok('eski initData rad etiladi', !verifyInitData(signInitData({ id: 1 }, TOKEN, Math.floor(Date.now() / 1000) - 4 * 86400), TOKEN));
   ok('/app sahifasi', (await get('/app')).type.startsWith('text/html'));
+  ok('«/» ham ilovani ochadi (BotFather «Ochish»)', (await get('/')).type.startsWith('text/html'));
   ok('/health', JSON.parse((await get('/health')).body).ok === true);
+  { const r1 = await new Promise(res => http.get({ port, path: '/m/9', headers: { Range: 'bytes=10-19' } }, r => { let b = ''; r.on('data', c => b += c); r.on('end', () => res({ st: r.statusCode, b, cr: r.headers['content-range'], ct: r.headers['content-type'] })); }));
+    ok('katta media oqimi: Range 206', r1.st === 206 && r1.b === 'abcdefghij' && r1.cr === 'bytes 10-19/200' && r1.ct === 'video/mp4', r1);
+    const r2 = await new Promise(res => http.get({ port, path: '/m/9' }, r => { let n = 0; r.on('data', c => n += c.length); r.on('end', () => res({ st: r.statusCode, n })); }));
+    ok('katta media: toʻliq 200', r2.st === 200 && r2.n === 200, r2); }
+
   { const m = await get('/mascot-bravo.webp'); ok('maskot rasmi beriladi', m.status === 200 && m.type === 'image/webp'); ok('notanish fayl — 404', (await get('/mascot-xxx.webp')).status === 404 && (await get('/mascot-../index.js')).status === 404); }
   let r = await call('me', {}, 'yolgon');
   ok('soxta initData → 401', r.status === 401);
@@ -307,12 +361,21 @@ async function apiTests(store) {
   r = await call('review', { mode: 'heart' }, ID1);
   ok('jon toʻla boʻlsa takrorlash shart emas (yoki boshlanadi)', r.status === 200 || r.body.code === 'full', r.body);
   r = await call('lesson', { lid: 'l6', part: 3 }, IDT); ok('tester: istalgan qism ochiq', r.status === 200, r.body);
+
+  // «tg:7» havolasi darsda haqiqiy manzilga almashadi; yuklanmagan (#9) — boʻsh
+  {
+    const L = await store.get('ar_letters', 'l1'); L.parts.cards.cards[0].audio = 'tg:7'; L.parts.cards.cards[1].audio = 'tg:99'; await store.put('ar_letters', 'l1', L);
+    await new Promise(r => setTimeout(r, 10));
+    const rr = await call('lesson', { lid: 'l1', part: 3 }, IDT); const cs = rr.body.sess && rr.body.sess.items;
+    ok('bot orqali yuklangan audio darsda ishlaydi', cs && /^https:\/\/example\.test\/public\/arab\/tg\/7-/.test(cs[0].audio) && cs[1].audio === '', cs && cs.map(x => x.audio));
+  }
   await store.patch('ar_codes', 'A7K3P9', { status: 'blocked' });
   r = await call('me', {}, ID1); ok('bloklangan → 403', r.status === 403 && r.body.code === 'blocked');
   await store.patch('ar_codes', 'A7K3P9', { status: 'active' });
   // parallel soʻrovlar navbatda (dinor ikki marta ayrilmaydi)
-  await store.patch('ar_prog', 'A7K3P9', { dinor: 15 }); await store.patch('ar_products', 'p1', { stock: 5 });
+  await store.patch('ar_prog', 'A7K3P9', { dinor: 15 }); await store.patch('ar_products', 'p1', { stock: 5 }); api.drop('A7K3P9');
   const both = await Promise.all([call('buy', { pid: 'p1', phone: '901234567' }, ID1), call('buy', { pid: 'p1', phone: '901234567' }, ID1)]);
+  await api.flush();
   ok('bir vaqtda 2 xarid: faqat bittasi', both.filter(x => x.status === 200).length === 1 && (await store.get('ar_prog', 'A7K3P9')).dinor === 5, both.map(x => x.body));
   srv.close();
 }

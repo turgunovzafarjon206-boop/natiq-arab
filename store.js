@@ -68,6 +68,7 @@ class SupabaseStore {
     const blob = this._ok(await this.sb.storage.from(bucket).download(path));
     return Buffer.from(await blob.arrayBuffer());
   }
+  publicUrl(bucket, path) { return this.url.replace(/\/+$/, '') + '/storage/v1/object/public/' + bucket + '/' + path; }
   async signedUrl(bucket, path, sec = 3600) {
     return this._ok(await this.sb.storage.from(bucket).createSignedUrl(path, sec)).signedUrl;
   }
@@ -125,6 +126,7 @@ class MemoryStore {
   async upload(bucket, path, buffer) { this.files[bucket + '/' + path] = buffer; return path; }
   async download(bucket, path) { return this.files[bucket + '/' + path]; }
   async signedUrl(bucket, path) { return 'https://example.test/' + bucket + '/' + path; }
+  publicUrl(bucket, path) { return 'https://example.test/public/' + bucket + '/' + path; }
   async loginToken(userId) { return { token_hash: 'hash-' + userId, email: 'x@natiq.uz' }; }
   async userFromToken(token) { const m = /^tok-(.+)$/.exec(token || ''); return m ? m[1] : null; }
   async checkPassword(userId, password) { return !!(this.passwords && this.passwords[userId] === password); }

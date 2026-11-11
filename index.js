@@ -3,6 +3,8 @@
      BOT_TOKEN             — yangi botning tokeni (@BotFather). Hech kimga bermang, kodga yozmang.
      SUPABASE_URL          — saytdagi Supabase loyiha manzili (https://xxxx.supabase.co)
      SUPABASE_SERVICE_KEY  — Supabase → Settings → API → service_role (yoki sb_secret_…) kaliti
+     ADMIN_IDS             — ixtiyoriy: media yuklaydigan adminlar Telegram ID’lari (saytdagi Sozlamalar’da ham qoʻshsa boʻladi)
+     TG_API_ID, TG_API_HASH — ixtiyoriy: 20 MB dan katta video/audio’ni bot orqali yuklash uchun (my.telegram.org → API development tools)
      APP_URL               — ixtiyoriy. Boʻlmasa: https://<RAILWAY_PUBLIC_DOMAIN>/app
    Railway → Settings → Networking → «Generate Domain» bosilgan boʻlishi shart (Mini App HTTPS’da ochiladi). */
 const http = require('http');
@@ -11,6 +13,7 @@ const path = require('path');
 const { SupabaseStore, MemoryStore } = require('./store');
 const { createApi } = require('./api');
 const { createArabBot } = require('./bot');
+const { createBig } = require('./mtproto');
 
 /* GitHub’da fayllar bir papkada (app.html index.js yonida) yoki public/ ichida boʻlishi mumkin */
 const APP_FILE = [path.join(__dirname, 'app.html'), path.join(__dirname, '..', 'public', 'app.html')].find(f => fs.existsSync(f)) || path.join(__dirname, 'app.html');
@@ -19,15 +22,33 @@ const APP_FILE = [path.join(__dirname, 'app.html'), path.join(__dirname, '..', '
 const MASCOTS = ['read', 'thumbs', 'cheer', 'bravo', 'think', 'goodjob', 'cool', 'party', 'love', 'sleep', 'write', 'learn', 'peek', 'walk', 'stars', 'trophy'];
 const assetPath = f => [path.join(__dirname, f), path.join(__dirname, '..', 'public', f)].find(x => fs.existsSync(x)) || null;
 
-function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), info = () => ({}) }) {
+function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), info = () => ({}), store, big }) {
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x'); const p = url.pathname.replace(/\/+$/, '') || '/';
     const send = (st, body, type = 'application/json; charset=utf-8', extra = {}) => { res.writeHead(st, Object.assign({ 'Content-Type': type, 'X-Content-Type-Options': 'nosniff' }, extra)); res.end(body); };
     try {
-      if (req.method === 'GET' && (p === '/health' || p === '/')) return send(200, JSON.stringify(Object.assign({ ok: true, app: 'natiq-arab' }, info())));
+      if (req.method === 'GET' && p === '/health') return send(200, JSON.stringify(Object.assign({ ok: true, app: 'natiq-arab' }, info())));
       const m = /^\/mascot-([a-z]+)\.(webp|jpg|png)$/.exec(p);
+      /* bot orqali yuklangan katta media: Telegramdan oqim (Range bilan) */
+      const mm = /^\/m\/(\d+)$/.exec(p);
+      if (req.method === 'GET' && mm && store) {
+        const md = await store.get('ar_media', mm[1]);
+        if (!md || !md.msgId || !big) return send(404, JSON.stringify({ error: 'Topilmadi' }));
+        const size = +md.size || big.sizeOf(await big.media(md.msgId)); const mime = md.mime || 'application/octet-stream';
+        const rg = /bytes=(\d*)-(\d*)/.exec(req.headers.range || ''); let start = 0, end = size - 1, st = 200;
+        if (rg && size) { if (rg[1] === '' && rg[2]) { start = Math.max(0, size - +rg[2]); } else { start = +rg[1] || 0; if (rg[2]) end = Math.min(+rg[2], size - 1); } st = 206; }
+        if (start > end) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); return res.end(); }
+        const head = { 'Content-Type': mime, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, 'Cache-Control': 'public, max-age=86400' };
+        if (st === 206) head['Content-Range'] = `bytes ${start}-${end}/${size}`;
+        res.writeHead(st, head); if (req.method === 'HEAD') return res.end();
+        let closed = false; req.on('close', () => { closed = true; });
+        try { for await (const ch of big.range(md.msgId, start, end)) { if (closed) break; if (!res.write(ch)) await new Promise(r => res.once('drain', r)); } }
+        catch (e) { console.error('media oqim', e.message); }
+        return res.end();
+      }
       if (req.method === 'GET' && m && MASCOTS.includes(m[1])) { const f = assetPath(`mascot-${m[1]}.${m[2]}`); if (f) return send(200, fs.readFileSync(f), { webp: 'image/webp', jpg: 'image/jpeg', png: 'image/png' }[m[2]], { 'Cache-Control': 'public, max-age=604800' }); }
-      if (req.method === 'GET' && p === '/app') return send(200, appHtml(), 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache' });
+      /* «/» ham ilovani ochadi: BotFather’da domenning oʻzi yozilgan boʻlsa ham («Ochish» tugmasi) */
+      if (req.method === 'GET' && (p === '/app' || p === '/')) return send(200, appHtml(), 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache' });
       if (req.method === 'POST' && p.startsWith('/api/')) {
         let body = ''; let big = false;
         for await (const ch of req) { body += ch; if (body.length > 65536) { big = true; break; } }
@@ -52,11 +73,13 @@ async function main() {
 
   let A;
   const api = createApi({ store, token, onOrder: o => A && A.notifyOrder(o) });
-  A = createArabBot({ token, store, appUrl, cfg: () => api.cfg(), asset: assetPath });
+  const big = createBig({ apiId: env.TG_API_ID, apiHash: env.TG_API_HASH, token });
+  if (big) big.connect().then(() => console.log('MTProto ulandi — katta fayllar yuklanadi')).catch(e => console.error('MTProto:', e.message));
+  A = createArabBot({ token, store, appUrl, big, cfg: () => api.cfg(), asset: assetPath, adminIds: String(env.ADMIN_IDS || '').split(/[\s,;]+/).filter(Boolean) });
   const bot = A.bot;
   await bot.init();
   const started = new Date().toISOString();
-  const server = createServer({ api, info: () => ({ bot: bot.botInfo && bot.botInfo.username, appUrl, started }) });
+  const server = createServer({ api, store, big, info: () => ({ bot: bot.botInfo && bot.botInfo.username, appUrl, started }) });
   const port = +env.PORT || 3000; server.listen(port, () => console.log('HTTP :' + port, appUrl || ''));
 
   try { await bot.api.setMyCommands([{ command: 'start', description: 'Boshlash' }, { command: 'app', description: 'Ilovani ochish' }]); } catch (e) { }

@@ -47,9 +47,9 @@ input,textarea{font:inherit}
 @keyframes zz{0%{opacity:0;transform:translate(0,10px) scale(.6)}30%{opacity:1}100%{opacity:0;transform:translate(30px,-46px) scale(1.25)}}
 .wake{animation:wake .6s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes wake{0%{transform:scale(.7) rotate(-8deg);opacity:.2}100%{transform:none;opacity:1}}
-#nap{position:fixed;right:10px;bottom:calc(var(--nav) + 10px + env(safe-area-inset-bottom));z-index:40;width:120px;height:120px;transition:transform .45s cubic-bezier(.2,1.4,.4,1);transform:translateY(170%)}
+#nap{position:fixed;right:6px;bottom:calc(var(--nav) + 6px + env(safe-area-inset-bottom));z-index:40;width:92px;height:92px;transition:transform .45s cubic-bezier(.2,1.4,.4,1);transform:translateY(170%)}
 #nap.on{transform:none}
-#nap .msc{width:120px;height:120px}
+#nap .msc{width:92px;height:92px}
 #nap .zz{right:4px;top:-4px;font-size:20px}
 .fbm{width:70px;height:70px;margin-left:auto;margin-top:-18px;animation:pop .45s cubic-bezier(.2,1.6,.4,1) both;flex:none}
 .hero .msc{width:176px;height:176px;position:relative;animation:heroIn .8s cubic-bezier(.2,1.6,.4,1) both,float 3s ease-in-out .8s infinite}
@@ -257,14 +257,16 @@ h2.tt{font-size:24px;font-weight:900;margin:4px 0 2px}
 /* ----- daraxt kinosi (3D harakatli animatsiya) ----- */
 #cine{position:fixed;inset:0;z-index:95;background:#8FD3FF;overflow:hidden}
 #cine svg.sc{position:absolute;inset:0;width:100%;height:100%}
-#cine .cap{position:absolute;left:0;right:0;bottom:0;padding:22px 20px calc(24px + env(safe-area-inset-bottom));text-align:center;color:#fff;background:linear-gradient(transparent,rgba(20,40,10,.55) 40%)}
-#cine .cap h2{font-size:30px;font-weight:900;margin:0 0 4px;text-shadow:0 3px 0 rgba(0,0,0,.25);opacity:0;animation:capIn .6s both}
+#cine .cap{position:absolute;left:0;right:0;bottom:0;padding:16px 18px calc(20px + env(safe-area-inset-bottom));color:#fff;background:linear-gradient(transparent,rgba(20,40,10,.6) 35%)}
+#cine .caprow{display:flex;align-items:center;gap:10px;max-width:440px;margin:0 auto 12px;text-align:left}
+#cine .caprow .msc{width:84px;height:84px;flex:none}
+#cine .cap h2{font-size:26px;font-weight:900;margin:0 0 4px;text-shadow:0 3px 0 rgba(0,0,0,.25);opacity:0;animation:capIn .6s both}
 #cine .cap p{margin:0 0 16px;font-size:16px;opacity:0;animation:capIn .6s both}
 #cine .cap .btn{opacity:0;animation:capIn .5s both;max-width:420px;margin:0 auto}
 #cine .skip{position:absolute;top:calc(14px + env(safe-area-inset-top));right:14px;background:rgba(0,0,0,.28);color:#fff;border-radius:99px;padding:8px 14px;font-weight:900;font-size:13px;z-index:3}
 #cine video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
 @keyframes capIn{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:none}}
-.cam{animation:cam var(--dur) cubic-bezier(.45,0,.2,1) both;transform-box:view-box;transform-origin:200px 560px}
+.cam{animation:cam var(--dur) cubic-bezier(.45,0,.2,1) both;transform-box:view-box;transform-origin:200px var(--by,465px)}
 @keyframes cam{0%{transform:scale(1.6) translateY(40px)}100%{transform:scale(1) translateY(0)}}
 .par1{animation:par1 var(--dur) ease-out both}.par2{animation:par2 var(--dur) ease-out both}.par3{animation:par3 var(--dur) ease-out both}
 @keyframes par1{0%{transform:translateX(-30px)}100%{transform:none}}
@@ -565,7 +567,7 @@ function closeIntro(){clearTimeout(INTRO_T);const d=$('intro');if(!d||d.classLis
 /* uzoq tegilmasa — maskot burchakda uxlaydi; tegilsa uygʻonadi */
 let IDLE_T=null;
 function idleReset(){clearTimeout(IDLE_T);const n=$('nap');if(n&&n.classList.contains('on')&&!n.dataset.w)wakeNap();IDLE_T=setTimeout(showNap,45000);}
-function showNap(){if(!ME||$('intro')||$('cine')||!$('ov').classList.contains('hide')||$('sheet').classList.contains('on')){IDLE_T=setTimeout(showNap,15000);return;}
+function showNap(){if(!ME||TAB==='garden'||$('intro')||$('cine')||!$('ov').classList.contains('hide')||$('sheet').classList.contains('on')){IDLE_T=setTimeout(showNap,15000);return;}
  let n=$('nap');if(n)return;n=document.createElement('div');n.id='nap';n.innerHTML=MS('sleep','breath')+'<span class="zz">z</span><span class="zz" style="animation-delay:.8s">Z</span>';document.body.appendChild(n);requestAnimationFrame(()=>requestAnimationFrame(()=>n.classList.add('on')));}
 function wakeNap(){const n=$('nap');if(!n)return;n.dataset.w=1;n.innerHTML=MS('cheer','wake');sfx('pop',0,500);setTimeout(()=>{n.classList.remove('on');setTimeout(()=>n.remove(),500);},1300);}
 ['pointerdown','keydown','scroll','touchstart'].forEach(e=>addEventListener(e,()=>{if(ME)idleReset();},{passive:true}));
@@ -638,7 +640,7 @@ function topbar(){const g=ME.garden,p=ME.prog;
   <button class="stat s-tree" onclick="go('garden')" aria-label="${T('Daraxt')}">${stk('tree')}<span>${g.count}</span></button></div>`;}
 function navbar(){const it=[['learn','Darslar','bookS'],['rank','Reyting','trophy'],['garden','Bogʻ','tree'],['profile','Profil','user']];
  return `<div class="in">${it.map(([k,n,i])=>`<button class="nb ${TAB===k?'on':''}" onclick="go('${k}')">${stk(i)}<span>${T(n)}</span></button>`).join('')}</div>`;}
-function go(t){TAB=t;SUB=null;render();window.scrollTo(0,0);hap('light');if(t==='rank')loadRating();if(t==='garden')setTimeout(scrollField,60);}
+function go(t){TAB=t;SUB=null;if(t==='garden'){const n=$('nap');if(n)n.remove();}render();window.scrollTo(0,0);hap('light');if(t==='rank')loadRating();if(t==='garden')setTimeout(scrollField,60);}
 function render(){if(!ME)return;SAYS.length=0;const v={learn:learnView,rank:rankView,garden:gardenView,profile:profileView}[TAB]();
  $('app').innerHTML=topbar()+v;$('nav').innerHTML=navbar();$('nav').classList.remove('hide');cyrDom($('app'));cyrDom($('nav'));backBtn();}
 function backBtn(){try{if(!TG||!TG.BackButton)return;const need=!!SUB||!$('ov').classList.contains('hide')||$('sheet').classList.contains('on');need?TG.BackButton.show():TG.BackButton.hide();}catch(e){}}
@@ -790,9 +792,16 @@ async function check(){if(LOCK)return;const it=SESS.items[SESS.i];let b;
  else if(it.type==='speak'){recStop();b={self:true};}
  else{if(SEL==null)return;b={choice:SEL};}
  LOCK=true;$('go').disabled=true;await send(b);}
-async function answer(){if(LOCK)return;LOCK=true;const g=$('go');if(g)g.disabled=true;await send({});}
+/* video/qoida/karta: javob tekshirilmaydi — keyingisiga darhol oʻtamiz, soʻrov fonda navbat bilan ketadi */
+let QUEUE=Promise.resolve();
+async function answer(){if(LOCK)return;const s=SESS;const g=$('go');if(g)g.disabled=true;
+ if(s.i>=s.n-1){LOCK=true;await send({});return;}
+ const i=s.i,sid=s.sid;
+ QUEUE=QUEUE.then(()=>api('step',{sid,i})).then(r=>{if(SESS!==s)return;if(r.code==='sync'){if(r.i!==s.i){s.i=r.i;drawItem();}return;}ME.prog.hearts=r.hearts;s.gain=r.gain;})
+  .catch(e=>{toast(e.message);if(e.code==='no_sess'){closeOv();refresh();}});
+ s.i++;drawItem();}
 async function send(extra){const s=SESS;let r;
- try{r=await api('step',Object.assign({sid:s.sid,i:s.i},extra));}catch(e){LOCK=false;const g=$('go');if(g)g.disabled=false;toast(e.message);if(e.code==='no_sess'){closeOv();refresh();}return;}
+ try{await QUEUE;if(SESS!==s)return;r=await api('step',Object.assign({sid:s.sid,i:s.i},extra));}catch(e){LOCK=false;const g=$('go');if(g)g.disabled=false;toast(e.message);if(e.code==='no_sess'){closeOv();refresh();}return;}
  if(r.code==='sync'){s.i=r.i;drawItem();return;}
  ME.prog.hearts=r.hearts;s.gain=r.gain;LAST=r;const it=s.items[s.i];
  if(it.t!=='q'||r.skip){next();return;}
@@ -887,7 +896,6 @@ function gardenView(){const G=ME.garden,C=ME.cfg;const L=id=>ME.path.find(x=>x.i
  if(G.sellable>0)h+=`<div class="card" style="margin-bottom:12px;display:flex;align-items:center;gap:12px">${stk('apple').replace('class="stk','style="width:46px;height:46px" class="stk')}<div class="grow"><b>${T('Mevalarni sotish')}</b><div class="muted" style="font-size:13px;display:flex;align-items:center;gap:2px">${G.sellable} × ${C.fruitPrice} = <b class="price" style="font-size:14px">${stk('coin')}${fmt(G.sellable*C.fruitPrice)}</b></div></div><button class="btn sm ok" onclick="sellFruit()">${T('Sotish')}</button></div>`;
  const thirsty=G.trees.filter(t=>t.dry||(t.stage>=5&&t.water&&t.water.can));
  if(thirsty.length)h+=`<div class="thirst">${thirsty.map(t=>`<div class="th"><div class="ar">${esc(L(t.lid).letter||'')}</div><div style="font-size:12px" class="${t.dry?'':'muted'}">${t.dry?T('Suv kerak'):'+'+C.waterFruit+' '+T('Meva')}</div><button class="btn blue" onclick="startReview('water','${t.lid}')">${stk('drop').replace('class="stk','style="width:20px;height:20px" class="stk')} ${T('Sugʻorish')}</button></div>`).join('')}</div>`;
- h+=`<div class="card" style="font-size:14px"><b>${T('Qanday ishlaydi?')}</b><p class="muted" style="margin:6px 0 0;line-height:1.55">Har bir harf — dalada bitta daraxt. 1-qism — nihol ekiladi, 2 — unib chiqadi, 3 — nihol boʻladi, 4 — daraxt, 5 — ${C.fruitStart||3} ta meva soladi. Bitta daraxtdan keyin ${C.witherAfter} ta yangi daraxt meva solsa, u quriydi — ${C.waterQ} savollik takrorlash bilan sugʻoring. Sugʻorish meva sonini ham koʻpaytiradi. 1 meva = ${C.fruitPrice} dinor.</p></div>`;
  return h+`</div>`;}
 function treeSheet(lid){const t=ME.garden.trees.find(x=>x.lid===lid);if(!t)return;const L=ME.path.find(x=>x.id===lid)||{};const C=ME.cfg;hap('light');
  const st=t.dry?T('Quridi'):T(['','Nihol ekildi','Unib chiqdi','Nihol boʻldi','Daraxt boʻldi','Meva soldi'][t.stage]);
@@ -913,16 +921,17 @@ function playCine2(stage,fruit){const full=stage>=5;const from=full?1:Math.max(1
  let sp='';const SP=[[-50,-120],[48,-110],[-60,-60],[58,-55],[0,-140],[-30,-150],[30,-145],[70,-90],[-72,-95]];if(full)SP.forEach((p,i)=>{sp+=`<path class="spark" style="animation-delay:${tA+nA*.32+i*.12}s" d="M${p[0]} ${p[1]-7}l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#FFF7B0"/>`;});
  let lv='';if(full)for(let i=0;i<6;i++)lv+=`<ellipse class="leaf" style="animation-delay:${1+i*.9}s" cx="${-40+i*15}" cy="-110" rx="4" ry="2" fill="#5BC955"/>`;
  let rays='';for(let i=0;i<16;i++)rays+=`<path d="M200 170L${200+Math.cos(i/16*Math.PI*2)*700} ${170+Math.sin(i/16*Math.PI*2)*700}L${200+Math.cos((i+.45)/16*Math.PI*2)*700} ${170+Math.sin((i+.45)/16*Math.PI*2)*700}z" fill="#FFF6C8" opacity=".22"/>`;
- const d=document.createElement('div');d.id='cine';d.style.setProperty('--dur',(n*step+.6)+'s');
+ const BY=full?465:430;   // daraxt asosi — pastdagi yozuv va maskot uni toʻsmasin
+ const d=document.createElement('div');d.id='cine';d.style.setProperty('--dur',(n*step+.6)+'s');d.style.setProperty('--by',BY+'px');
  d.innerHTML=`<svg class="sc" viewBox="0 0 400 700" preserveAspectRatio="xMidYMax slice"><rect width="400" height="700" fill="url(#gSky)"/><g class="rays">${rays}</g><circle cx="200" cy="170" r="110" fill="url(#gSun)"/><circle cx="200" cy="170" r="38" fill="#FFF3A0"/>
   <g class="par1"><g class="drift" style="animation-duration:26s"><g transform="translate(70 120)"><ellipse rx="44" ry="15" fill="#fff"/><ellipse cx="-18" cy="-8" rx="20" ry="15" fill="#fff"/><ellipse cx="16" cy="-12" rx="22" ry="18" fill="#fff"/></g><g transform="translate(330 220) scale(.8)"><ellipse rx="44" ry="15" fill="#fff"/><ellipse cx="-18" cy="-8" rx="20" ry="15" fill="#fff"/><ellipse cx="16" cy="-12" rx="22" ry="18" fill="#fff"/></g></g>
    <path d="M-80 700V420Q0 360 90 410T260 400T480 410V700z" fill="url(#gHill1)"/></g>
   <g class="par2"><path d="M-100 700V470Q20 430 140 470T380 460T520 470V700z" fill="url(#gHill2)"/>${Array.from({length:7},(_,i)=>`<g transform="translate(${-40+i*80} ${478+(i%2)*6}) scale(.35)">${treeG(4+(i%2),i%2?3:0,false,{noShadow:1,still:1})}</g>`).join('')}</g>
-  <g class="cam"><rect x="-200" y="520" width="800" height="300" fill="url(#gGrass)"/><g transform="translate(200 560) scale(2.5)"><ellipse cx="0" cy="3" rx="40" ry="7" fill="#1B3A0F" opacity=".2"/><ellipse cx="0" cy="-1" rx="22" ry="7" fill="url(#gSoil)"/>${st}${ap}${sp}${lv}</g></g>
+  <g class="cam"><rect x="-200" y="${BY-40}" width="800" height="400" fill="url(#gGrass)"/><g transform="translate(200 ${BY}) scale(${full?2.25:2.6})"><ellipse cx="0" cy="3" rx="40" ry="7" fill="#1B3A0F" opacity=".2"/><ellipse cx="0" cy="-1" rx="22" ry="7" fill="url(#gSoil)"/>${st}${ap}${sp}${lv}</g></g>
   <g class="par3">${Array.from({length:14},(_,i)=>`<path d="M${i*31} 700l-6-34M${i*31+6} 700l2-40M${i*31+12} 700l8-30" stroke="#3E9B3E" stroke-width="5" stroke-linecap="round"/>`).join('')}</g></svg>
   <button class="skip" onclick="endCine()">${T('Oʻtkazib yuborish')}</button>
-  <div class="cap">${MS(full?'trophy':'cheer','',`width:${full?150:120}px;height:${full?150:120}px;margin:0 auto 4px;opacity:0;animation:capIn .6s cubic-bezier(.2,1.6,.4,1) ${total-.6}s both`)}<h2 style="animation-delay:${total-.4}s">${full?T('Daraxtingiz meva soldi!'):T(['','Nihol ekildi','Unib chiqdi','Nihol boʻldi','Daraxt boʻldi','Meva soldi'][stage])+'!'}</h2>
-   ${full?`<p style="animation-delay:${total-.2}s">+${fruit||3} ${T('Meva')} · ${T('Dalada')} ${ME.garden.count} ${T('ta daraxt')}</p>`:'<p></p>'}<button class="btn" style="animation-delay:${total}s" onclick="endCine()">${T('Ajoyib!')}</button></div>`;
+  <div class="cap"><div class="caprow">${MS(full?'trophy':'cheer','',`opacity:0;animation:capIn .6s cubic-bezier(.2,1.6,.4,1) ${total-.6}s both`)}<div><h2 style="animation-delay:${total-.4}s">${full?T('Daraxtingiz meva soldi!'):T(['','Nihol ekildi','Unib chiqdi','Nihol boʻldi','Daraxt boʻldi','Meva soldi'][stage])+'!'}</h2>
+   ${full?`<p style="animation-delay:${total-.2}s;margin:0">+${fruit||3} ${T('Meva')} · ${T('Dalada')} ${ME.garden.count} ${T('ta daraxt')}</p>`:''}</div></div><button class="btn" style="animation-delay:${total}s" onclick="endCine()">${T('Ajoyib!')}</button></div>`;
  document.body.appendChild(d);cyrDom(d);backBtn();hap('medium');
  sfx('grow',n,step);if(full)sfx('fruit',tA,nA);
  clearTimeout(CINE_T);CINE_T=setTimeout(()=>hap('ok'),total*1000);}

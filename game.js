@@ -14,6 +14,7 @@ const DEF_CFG = {
   fruitStart: 3, witherAfter: 4, fruitPrice: 2,          // 5-qismda 3 meva; keyingi 4 daraxt meva solsa — quriydi
   rw: { video: 3, q: 1, card: 1 }, replayReward: false, finalMax: 15,
   notifyChats: '', support: '', treeVideo: '',
+  mediaAdmins: '',
   remindOn: true, remindDays: 2, remindRepeat: 0, remindMascot: 'learn',
   remindText: '{ism}, seni sogʻindim! 🦉\n{kun} kundan beri darsga kirmading. Bugun atigi 5 daqiqa ajrat — jonlaringni toʻldir, dinor yigʻ va bogʻingni sugʻor! 🌳',
 };

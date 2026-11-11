@@ -30,32 +30,61 @@ function createApi({ store, token, onOrder = async () => {}, clock = () => new D
     tail.then(() => { if (locks.get(k) === tail) locks.delete(k); }); return p; };
   let cfgC = null;
   async function cfg(fresh) { if (!fresh && cfgC && Date.now() - cfgC.at < 15000) return cfgC.v; const v = G.cfgOf(await store.get('ar_cfg', 'main')); cfgC = { at: Date.now(), v }; return v; }
-  const letters = () => store.list('ar_letters', { ttl: 30000 });
+  /* «tg:17» — bot orqali yuklangan media (ar_media) havolasiga almashtiriladi; hali yuklanmagan boʻlsa — boʻsh */
+  let medC = null;
+  async function mediaMap() { if (medC && Date.now() - medC.at < 15000) return medC.m; const m = new Map((await store.list('ar_media', { ttl: 15000 })).filter(x => x.status === 'ready' && x.url).map(x => [String(x.id), x.url])); medC = { at: Date.now(), m }; return m; }
+  const resolveTg = (v, M) => typeof v === 'string' ? v.replace(/^tg:(\d+)/, (_, n) => M.get(n) || '') : Array.isArray(v) ? v.map(x => resolveTg(x, M)) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, resolveTg(x, M)])) : v;
+  let letC = null;
+  async function letters() { const raw = await store.list('ar_letters', { ttl: 30000 }); const M = await mediaMap();
+    if (letC && letC.raw === raw && letC.m === M) return letC.v; const v = resolveTg(raw, M).map(l => { const P = l.parts || {};   // rasmli variant «tg:5 = olma» → yuklanmagan boʻlsa olib tashlanadi
+      ['video', 'rules', 'final', 'vocab'].forEach(k => (P[k] && P[k].tests || []).forEach(q => { if (q && q.type === 'image' && Array.isArray(q.opts)) q.opts = q.opts.map(o => /^\s*=/.test(o) ? '' : o); })); return l; });
+    letC = { raw, m: M, v }; return v; }
 
-  async function auth(initData) {
+  /* tezlik: tekshirilgan foydalanuvchi va oʻquvchi holati xotirada; bazaga yozish fonda (navbat bilan) */
+  const AUTH_TTL = 30000, PROG_TTL = 10 * 60e3;
+  const authC = new Map(), progC = new Map(), pend = new Map();
+  async function auth(initData, fresh) {
     const user = verifyInitData(initData, token); if (!user || !user.id) throw new ApiError(401, 'Telegram maʼlumoti tasdiqlanmadi. Ilovani bot orqali qayta oching', 'auth');
+    const k = String(user.id); const hit = !fresh && authC.get(k);
+    if (hit && Date.now() - hit.at < AUTH_TTL) return { user, tg: hit.tg, c: hit.c };
     const tg = await store.get('ar_tg', user.id); const c = tg && tg.code ? await store.get('ar_codes', tg.code) : null;
+    authC.delete(k);
     if (!c || String(c.tgId) !== String(user.id)) throw new ApiError(403, 'Avval botda /start bosing va ID kodingizni kiriting', 'not_linked');
     if (c.status === 'blocked') throw new ApiError(403, 'ID kodingiz bloklangan. Administrator bilan bogʻlaning', 'blocked');
+    authC.set(k, { tg, c, at: Date.now() });
     return { user, tg, c };
   }
+  async function getProg(code) { const h = progC.get(code); if (h && Date.now() - h.at < PROG_TTL) return h.p;
+    const p = await store.get('ar_prog', code); if (p) progC.set(code, { p, at: Date.now() }); return p; }
   async function loadProg(c, user) {
-    const C = await cfg(); let p = await store.get('ar_prog', c.id);
-    if (!p) p = G.freshProg(c.id, { hearts: C.maxHearts });
+    const C = await cfg(); let p = await getProg(c.id);
+    if (!p) { p = G.freshProg(c.id, { hearts: C.maxHearts }); progC.set(c.id, { p, at: Date.now() }); }
     p.name = c.name || [user.first_name, user.last_name].filter(Boolean).join(' ') || 'Oʻquvchi';
     p.tgId = user.id; p.group = c.groupId || ''; p.hideRank = !!c.hideRank;
     return p;
   }
-  const saveProg = p => store.put('ar_prog', p.code, p);
+  function flushCode(code) {
+    const st = pend.get(code) || {}; pend.set(code, st);
+    if (st.busy) { st.dirty = true; return st.busy; }
+    st.busy = (async () => { let tries = 0;
+      do { st.dirty = false; const h = progC.get(code); if (!h) break;
+        try { await store.put('ar_prog', code, JSON.parse(JSON.stringify(h.p))); }
+        catch (e) { console.error('saqlash', code, e.message); if (++tries < 5) { st.dirty = true; await new Promise(r => setTimeout(r, 1000 * tries)); } }
+      } while (st.dirty); })().finally(() => { st.busy = null; if (st.dirty) flushCode(code); });
+    return st.busy;
+  }
+  const saveProg = (p, wait) => { progC.set(p.code, { p, at: Date.now() }); const pr = flushCode(p.code); return wait ? pr : undefined; };
+  const flush = () => Promise.all([...pend.values()].map(st => st.busy).filter(Boolean));
+  const drop = code => { progC.delete(code); };
 
   /* admin amallari: dinor qoʻshish, jon, qaytarish (refund), qayta boshlash */
   async function applyOps(code, prog) {
     const ops = (await store.find('ar_ops', 'code', code)).filter(o => o.status === 'pending').sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')));
     if (!ops.length) return 0;
-    const C = await cfg(); let p = prog || await store.get('ar_prog', code) || G.freshProg(code, { hearts: C.maxHearts });
+    const C = await cfg(); let p = prog || await getProg(code) || G.freshProg(code, { hearts: C.maxHearts });
     for (const o of ops) { const okk = G.applyOp(p, o, C); await store.put('ar_ops', o.id, Object.assign({}, o, { status: okk ? 'done' : 'error', doneAt: clock().toISOString() }));
       if (o.type === 'refund' && o.orderId) { const ord = await store.get('ar_orders', o.orderId); if (ord) await store.put('ar_orders', ord.id, Object.assign(ord, { status: 'refunded', refundedAt: clock().toISOString() })); } }
-    if (!prog) await saveProg(p); return ops.length;
+    if (!prog) await saveProg(p, true); return ops.length;
   }
 
   function meView(c, p, C, L, groups) {
@@ -114,7 +143,7 @@ function createApi({ store, token, onOrder = async () => {}, clock = () => new D
         const price = +pr.price || 0; const stock = pr.stock === '' || pr.stock == null ? null : +pr.stock;
         if (stock !== null && stock <= 0) throw new ApiError(400, 'Mahsulot tugagan');
         const p = await loadProg(c, user); if ((p.dinor || 0) < price) throw new ApiError(400, `Dinor yetarli emas: ${price} kerak, sizda ${p.dinor || 0}`, 'poor');
-        p.dinor -= price; p.spent = (p.spent || 0) + price; await saveProg(p);
+        p.dinor -= price; p.spent = (p.spent || 0) + price; await saveProg(p, true);
         const id = G.uid(); const at = clock().toISOString();
         const ord = { code: c.id, tgId: user.id, name: p.name, username: user.username || '', phone: (ph.length === 9 ? '+998' : '+') + ph, productId: pr.id, productName: pr.name || '', price, status: 'new', at, note: String(b.note || '').slice(0, 300) };
         await store.put('ar_orders', id, ord);
@@ -138,7 +167,7 @@ function createApi({ store, token, onOrder = async () => {}, clock = () => new D
   async function handle(name, body) {
     try {
       if (!Object.prototype.hasOwnProperty.call(H, name)) throw new ApiError(404, 'Topilmadi');
-      const a = await auth(body && body.initData);
+      const a = await auth(body && body.initData, name === 'me');
       const k = a.user.id; const now = Date.now(); const h = (hits.get(k) || []).filter(t => now - t < 10000); h.push(now); hits.set(k, h);
       if (h.length > 40) throw new ApiError(429, 'Juda tez — biroz kuting');
       return { status: 200, body: await H[name](a, body || {}) };
@@ -147,7 +176,7 @@ function createApi({ store, token, onOrder = async () => {}, clock = () => new D
       console.error('api', name, e); return { status: 500, body: { error: 'Server xatosi: ' + e.message } };
     }
   }
-  return { handle, applyOps, lock, cfg, auth };
+  return { handle, applyOps, lock, cfg, auth, flush, drop };
 }
 
 module.exports = { createApi, verifyInitData, signInitData, ApiError };

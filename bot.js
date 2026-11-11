@@ -11,7 +11,7 @@ const digits = s => String(s || '').replace(/\D/g, '');
 const tgName = u => [u.first_name, u.last_name].filter(Boolean).join(' ');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new Date(), asset = () => null }) {
+function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new Date(), asset = () => null, adminIds = [], fetchImpl, big = null }) {
   const bot = new Bot(token, botOpts);
   const getCfg = cfg || (async () => G.cfgOf(await store.get('ar_cfg', 'main')));
   const now = () => clock().toISOString();
@@ -51,9 +51,72 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     return { tg, c: c && String(c.tgId) === String(id) ? c : null };
   }
 
+  /* ---------- admin: bot orqali media yuklash (saytda «📲 Bot» bosilganda raqam yaratiladi) ---------- */
+  const doFetch = fetchImpl || ((...a) => fetch(...a));
+  const isAdmin = async id => { const C = await getCfg(); return new Set([...String(C.mediaAdmins || '').split(/[\s,;]+/), ...adminIds].filter(Boolean).map(String)).has(String(id)); };
+  const ADMIN_KB = { keyboard: [[{ text: '📤 Media yuklash' }]], resize_keyboard: true, is_persistent: true };
+  const KIND_E = { video: '🎬', audio: '🔊', image: '🖼' };
+  const KIND_N = { video: '🎬 video', audio: '🔊 audio yoki oddiy ovozli xabar', image: '🖼 rasm' };
+  async function mediaList(ctx) {
+    const M = (await store.list('ar_media', { fresh: true })).filter(m => m.status !== 'ready').sort((a, b) => (+b.id) - (+a.id)).slice(0, 30);
+    if (!M.length) return ctx.reply('Yuklanishi kerak boʻlgan media yoʻq ✅\nSaytda darsga video yoki ovoz qoʻshayotganda «📲 Bot» tugmasini bosing — raqam paydo boʻladi.', { reply_markup: ADMIN_KB });
+    return ctx.reply('📤 Qaysi raqamga media yuborasiz? Tugmani bosing yoki raqamni yozing:', { reply_markup: { inline_keyboard: M.map(m => [{ text: `#${m.id} ${KIND_E[m.kind] || ''} ${String(m.label || '').slice(0, 42)}`, callback_data: 'ms:' + m.id }]) } });
+  }
+  async function pickSlot(ctx, n) {
+    const m = await store.get('ar_media', String(n)); if (!m) return ctx.reply(`#${n} raqamli media topilmadi. Roʻyxat: «📤 Media yuklash»`);
+    const tg = (await store.get('ar_tg', ctx.from.id)) || { tgId: ctx.from.id };
+    await store.put('ar_tg', ctx.from.id, Object.assign(tg, { mediaSlot: String(n), mediaAt: now() }));
+    return ctx.reply(`📥 #${n} — «${m.label || ''}»\nEndi ${KIND_N[m.kind] || 'fayl'} yuboring${big ? ' (hajmi cheklanmagan)' : ' (20 MB gacha)'}.${m.status === 'ready' ? '\n⚠️ Bu raqamga avval yuklangan — yangisi almashtiradi.' : ''}\nBekor qilish: /cancel`);
+  }
+  bot.command('media', async ctx => { if (ctx.chat.type !== 'private') return; if (!(await isAdmin(ctx.from.id))) return ctx.reply(`Bu buyruq faqat adminlar uchun. Sizning ID: ${ctx.from.id}`); return mediaList(ctx); });
+  bot.command('cancel', async ctx => { const tg = await store.get('ar_tg', ctx.from.id); if (tg && tg.mediaSlot) { await store.put('ar_tg', ctx.from.id, Object.assign(tg, { mediaSlot: null })); return ctx.reply('Bekor qilindi.', { reply_markup: ADMIN_KB }); } });
+  bot.hears('📤 Media yuklash', async ctx => { if (ctx.chat.type !== 'private') return; if (!(await isAdmin(ctx.from.id))) return; return mediaList(ctx); });
+  bot.callbackQuery(/^ms:(\d+)$/, async ctx => { try { await ctx.answerCallbackQuery(); } catch (e) { } if (!(await isAdmin(ctx.from.id))) return; return pickSlot(ctx, ctx.match[1]); });
+  bot.on(['message:video', 'message:voice', 'message:audio', 'message:photo', 'message:document', 'message:video_note', 'message:animation'], async (ctx, next) => {
+    if (ctx.chat.type !== 'private') return next();
+    const tg = await store.get('ar_tg', ctx.from.id); if (!tg || !tg.mediaSlot || !(await isAdmin(ctx.from.id))) return next();
+    const n = String(tg.mediaSlot); const slot = await store.get('ar_media', n); if (!slot) return ctx.reply(`#${n} topilmadi.`);
+    const m = ctx.message; let f, kind, mime;
+    if (m.video) { f = m.video; kind = 'video'; mime = f.mime_type || 'video/mp4'; }
+    else if (m.video_note) { f = m.video_note; kind = 'video'; mime = 'video/mp4'; }
+    else if (m.animation) { f = m.animation; kind = 'video'; mime = f.mime_type || 'video/mp4'; }
+    else if (m.voice) { f = m.voice; kind = 'audio'; mime = 'audio/ogg'; }
+    else if (m.audio) { f = m.audio; kind = 'audio'; mime = f.mime_type || 'audio/mpeg'; }
+    else if (m.photo) { f = m.photo[m.photo.length - 1]; kind = 'image'; mime = 'image/jpeg'; }
+    else if (m.document) { f = m.document; mime = f.mime_type || ''; kind = /^video/.test(mime) ? 'video' : /^audio/.test(mime) ? 'audio' : /^image/.test(mime) ? 'image' : ''; }
+    if (!kind) return ctx.reply('Bu turdagi fayl qabul qilinmaydi. Video, audio, ovozli xabar yoki rasm yuboring.');
+    if (slot.kind && slot.kind !== kind) return ctx.reply(`#${n} uchun ${KIND_N[slot.kind]} kerak — siz ${KIND_N[kind]} yubordingiz. Qaytadan yuboring yoki /cancel`);
+    if ((f.file_size || 0) > 20 * 1048576) {   // katta fayl: Telegramda qoladi, ilovaga oqim qilib beriladi (MTProto)
+      if (!big) return ctx.reply('⚠️ Bu fayl 20 MB dan katta. Katta fayllarni qabul qilish uchun Railway → Variables’ga bir marta TG_API_ID va TG_API_HASH qoʻshing (my.telegram.org → API development tools). Shundan soʻng istalgan hajmdagi video yuklanadi.');
+      try {
+        await ctx.reply('⏳ Katta fayl tekshirilmoqda…'); await big.media(m.message_id);
+        const base = String(appUrl || '').replace(/\/app\/?$/, '');
+        await store.put('ar_media', n, Object.assign(slot, { status: 'ready', url: `${base}/m/${n}`, msgId: m.message_id, mime, size: f.file_size, src: m.voice ? 'voice' : kind, big: true, by: ctx.from.id, byName: tgName(ctx.from), at: now() }));
+        await store.put('ar_tg', ctx.from.id, Object.assign(tg, { mediaSlot: null }));
+        await ctx.reply(`✅ #${n} yuklandi (${Math.round(f.file_size / 1048576)} MB) — «${slot.label || ''}».\nFayl Telegramda saqlanadi va ilovada toʻgʻridan-toʻgʻri koʻrsatiladi.`, { reply_markup: ADMIN_KB });
+        const left = (await store.list('ar_media', { fresh: true })).filter(x => x.status !== 'ready').length; if (left) return mediaList(ctx);
+        return;
+      } catch (e) { console.error('katta media', e.message); return ctx.reply('❌ Katta faylni olib boʻlmadi: ' + e.message); }
+    }
+    await ctx.reply('⏳ Yuklanmoqda…');
+    try {
+      const file = await bot.api.getFile(f.file_id);
+      const r = await doFetch(`https://api.telegram.org/file/bot${token}/${file.file_path}`); if (!r.ok) throw new Error('Telegram fayli olinmadi (HTTP ' + r.status + ')');
+      const buf = Buffer.from(await r.arrayBuffer());
+      let ext = (String(file.file_path || '').split('.').pop() || '').toLowerCase(); if (!/^[a-z0-9]{2,5}$/.test(ext)) ext = { video: 'mp4', audio: 'ogg', image: 'jpg' }[kind]; if (ext === 'oga') ext = 'ogg';
+      const path = `tg/${n}-${Date.now()}.${ext}`; await store.upload('arab', path, buf, mime);
+      const url = store.publicUrl ? store.publicUrl('arab', path) : '';
+      await store.put('ar_media', n, Object.assign(slot, { status: 'ready', url, path, mime, size: buf.length, src: m.voice ? 'voice' : kind, by: ctx.from.id, byName: tgName(ctx.from), at: now() }));
+      await store.put('ar_tg', ctx.from.id, Object.assign(tg, { mediaSlot: null }));
+      await ctx.reply(`✅ #${n} yuklandi — «${slot.label || ''}».\nIlovada 15 soniya ichida paydo boʻladi.`, { reply_markup: ADMIN_KB });
+      const left = (await store.list('ar_media', { fresh: true })).filter(x => x.status !== 'ready').length; if (left) return mediaList(ctx);
+    } catch (e) { console.error('media', e.message); return ctx.reply('❌ Yuklab boʻlmadi: ' + e.message); }
+  });
+
   bot.command('start', async ctx => {
     if (ctx.chat.type !== 'private') return;
     const id = ctx.from.id; const { tg, c } = await linked(id);
+    if (await isAdmin(id)) await ctx.reply('🛠 Admin: darslar uchun video va ovozlarni «📤 Media yuklash» tugmasi orqali yuborasiz.', { reply_markup: ADMIN_KB });
     if (c && c.status === 'active') return welcome(ctx, c);
     if (c && c.status === 'blocked') return ctx.reply('⛔ ID kodingiz bloklangan. Administrator bilan bogʻlaning.');
     const base = Object.assign({}, tg || {}, { tgId: id, name: tgName(ctx.from), username: ctx.from.username || '', at: now() });
@@ -79,8 +142,11 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
   bot.on('message:text', async ctx => {
     if (ctx.chat.type !== 'private') return;
     const text = ctx.message.text.trim(); if (text.startsWith('/')) return;
-    const id = ctx.from.id; const tg = await store.get('ar_tg', id);
-    if (!tg || !tg.phone) return askPhone(ctx);
+    const id = ctx.from.id; let tg = await store.get('ar_tg', id);
+    const adm = await isAdmin(id);
+    if (adm && /^#?\d{1,5}$/.test(text)) return pickSlot(ctx, text.replace('#', ''));
+    if (adm && !(tg && tg.phone)) tg = Object.assign(tg || {}, { tgId: id, phone: tg && tg.phone || '' });
+    if (!tg || (!tg.phone && !adm)) return askPhone(ctx);
     const code = normCode(text); const cur = (await linked(id)).c;
     if (!CODE_RE.test(code)) {
       if (cur && cur.status === 'active') return welcome(ctx, cur);
