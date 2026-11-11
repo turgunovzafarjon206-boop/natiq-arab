@@ -1,0 +1,19 @@
+{
+  "name": "natiq-arab",
+  "version": "1.0.0",
+  "description": "Natiq Arab — arab tilini oʻyin orqali oʻrganish: Telegram bot + Mini App (Natiq Academy)",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.js"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "grammy": "^1.30.0",
+    "ws": "^8.22.0"
+  }
+}
