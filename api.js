@@ -67,7 +67,7 @@ function createApi({ store, token, onOrder = async () => {}, clock = () => new D
       user: { name: p.name, code: c.id, phone: c.tgPhone || '', tester, group: g ? { name: g.name || '', days: g.days || [], time: g.time || '', dur: g.dur || '', meet: g.meet || '', note: g.note || '' } : null },
       cfg: { appName: C.appName, primary: C.primary, accent: C.accent, fruitPrice: C.fruitPrice, maxHearts: C.maxHearts, rw: C.rw, reviewQ: C.reviewQ, heartPer: C.heartPer,
         waterQ: C.waterQ, waterMin: C.waterMin, waterFruit: C.waterFruit, witherAfter: C.witherAfter, fruitStart: C.fruitStart, treeVideo: C.treeVideo || '', support: C.support || '', replayReward: !!C.replayReward },
-      prog: { dinor: p.dinor || 0, hearts: p.hearts || 0, days: p.days || 0, streak: p.streak || 0, lessons: p.lessons || 0, earned: p.earned || 0, sold: p.sold || 0, spent: p.spent || 0, lang: p.lang || 'uz', dark: !!p.dark },
+      prog: { dinor: p.dinor || 0, hearts: p.hearts || 0, days: p.days || 0, lastDay: p.lastDay || '', streak: p.streak || 0, lessons: p.lessons || 0, earned: p.earned || 0, sold: p.sold || 0, spent: p.spent || 0, lang: p.lang || 'uz', dark: !!p.dark },
       path, cur: G.current(p, L), garden: G.garden(p, C), sess: p.sess ? G.sessPublic(p.sess) : null,
     };
   }

@@ -223,6 +223,28 @@ async function botTests(store) {
   const m1 = await store.get('ar_msgs', 'm1'), m2 = await store.get('ar_msgs', 'm2');
   ok('guruhga xabar (1 kishi)', m1.status === 'done' && m1.sent === 1, m1);
   ok('hammaga xabar (2 faol)', m2.status === 'done' && m2.sent === 2, m2);
+
+  // maskot eslatmasi: 2 kun kirmasa — 3-kuni
+  {
+    const path = require('path'); const fs = require('fs');
+    const clock = () => new Date('2026-11-12T07:00:00Z');   // Toshkent 12:00
+    const B = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app', clock, asset: f => { const x = path.join(__dirname, f); return fs.existsSync(x) ? x : null; },
+      botOpts: { botInfo: { id: 7, is_bot: true, first_name: 'N', username: 'natiq_arab_bot', can_join_groups: false, can_read_all_group_messages: false, supports_inline_queries: false } } });
+    const C2 = []; B.bot.api.config.use(async (prev, method, payload) => { C2.push({ method, payload }); return { ok: true, result: { message_id: 1, date: 0, chat: { id: 1, type: 'private' }, photo: [{ file_id: 'F1', width: 1, height: 1, file_unique_id: 'u' }] } }; });
+    await store.patch('ar_prog', 'A7K3P9', { lastDay: '2026-11-10' });     // 1 kun oʻtdi
+    let n = await B.processReminders(); ok('1 kun kirmasa — eslatma yoʻq', n === 0, n);
+    await store.patch('ar_prog', 'A7K3P9', { lastDay: '2026-11-09' });     // 10 va 11 kirmadi → 12-da
+    await store.patch('ar_cfg', 'main', { remindText: '{ism}, {kun} kundan beri kirmading!' });
+    n = await B.processReminders();
+    const ph = C2.filter(c => c.method === 'sendPhoto');
+    ok('3-kuni maskot rasmi + admin matni + ilova tugmasi', n >= 1 && ph.some(c => c.payload.chat_id === 111 && /Aziza, 3 kundan beri kirmading!/.test(c.payload.caption) && c.payload.reply_markup.inline_keyboard), ph.map(c => c.payload.caption));
+    n = await B.processReminders(); ok('bir marta yuboriladi (takrorlanmaydi)', !C2.slice(ph.length).some(c => c.method === 'sendPhoto' && c.payload.chat_id === 111));
+    await store.patch('ar_cfg', 'main', { remindOn: false }); await store.patch('ar_tg', 111, { remindFor: null });
+    n = await B.processReminders(); ok('admin oʻchirsa — yuborilmaydi', n === 0); await store.patch('ar_cfg', 'main', { remindOn: true });
+    const late = createArabBot({ token: TOKEN, store, appUrl: '', clock: () => new Date('2026-11-12T18:00:00Z'), botOpts: { botInfo: { id: 7, is_bot: true, first_name: 'N', username: 'x', can_join_groups: false, can_read_all_group_messages: false, supports_inline_queries: false } } });
+    ok('kechasi (23:00) yuborilmaydi', (await late.processReminders()) === 0);
+    await store.del('ar_prog', 'A7K3P9');
+  }
   await notifyOrder({ productName: 'Kitob', price: 10, name: 'Aziza', code: 'A7K3P9', phone: '+998901234567' });
   ok('operatorga buyurtma xabari', sent('sendMessage').some(c => c.payload.chat_id === '-100500' && /Yangi buyurtma/.test(c.payload.text)));
 }
@@ -246,6 +268,7 @@ async function apiTests(store) {
   ok('eski initData rad etiladi', !verifyInitData(signInitData({ id: 1 }, TOKEN, Math.floor(Date.now() / 1000) - 4 * 86400), TOKEN));
   ok('/app sahifasi', (await get('/app')).type.startsWith('text/html'));
   ok('/health', JSON.parse((await get('/health')).body).ok === true);
+  { const m = await get('/mascot-bravo.webp'); ok('maskot rasmi beriladi', m.status === 200 && m.type === 'image/webp'); ok('notanish fayl — 404', (await get('/mascot-xxx.webp')).status === 404 && (await get('/mascot-../index.js')).status === 404); }
   let r = await call('me', {}, 'yolgon');
   ok('soxta initData → 401', r.status === 401);
   r = await call('me', {}, ID2);

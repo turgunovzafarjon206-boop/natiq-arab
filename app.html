@@ -24,6 +24,45 @@ input,textarea{font:inherit}
 #app{max-width:560px;margin:0 auto;min-height:100vh;padding-bottom:calc(var(--nav) + 16px + env(safe-area-inset-bottom))}
 /* ----- stikerlar ----- */
 .stk{display:inline-block;flex:none;overflow:visible;vertical-align:middle}
+/* ----- maskot ----- */
+.msc{display:block;object-fit:contain;pointer-events:none;-webkit-user-drag:none}
+#intro{position:fixed;inset:0;z-index:98;background:radial-gradient(circle at 50% 42%,#FFF3C4,var(--bg) 62%);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .45s;overflow:hidden}
+:root.dark #intro{background:radial-gradient(circle at 50% 42%,#3B300F,var(--bg) 62%)}
+#intro.out{opacity:0;pointer-events:none}
+#intro .stage{position:relative;width:250px;height:250px}
+#intro .stage .msc{width:250px;height:250px;position:absolute;left:0;bottom:0}
+#intro .shadow{position:absolute;left:50%;bottom:-8px;width:160px;height:20px;margin-left:-80px;border-radius:50%;background:rgba(80,50,0,.18);filter:blur(3px)}
+#intro .hint{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom));font-size:12.5px;color:var(--mut);font-weight:800}
+.walkin{animation:walkIn 1.45s cubic-bezier(.25,.75,.35,1) both}
+@keyframes walkIn{0%{transform:translateX(-115vw)}100%{transform:none}}
+.stepb{animation:stepB .29s ease-in-out 5,hop .65s cubic-bezier(.3,1.7,.5,1) 1.5s 1}
+@keyframes stepB{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-13px) rotate(4deg)}}
+@keyframes hop{45%{transform:translateY(-30px) scale(1.05) rotate(-3deg)}}
+.bubble{position:relative;margin-top:22px;background:var(--card);border:2px solid var(--line);border-radius:20px;padding:12px 20px;font-size:20px;font-weight:900;box-shadow:0 4px 0 var(--line);opacity:0;animation:bub .45s cubic-bezier(.2,1.6,.4,1) 1.45s both;max-width:320px;text-align:center}
+.bubble::before{content:"";position:absolute;top:-11px;left:50%;margin-left:-10px;border:10px solid transparent;border-top:0;border-bottom-color:var(--line)}
+@keyframes bub{0%{opacity:0;transform:scale(.5) translateY(12px)}100%{opacity:1;transform:none}}
+.breath{animation:breath 2.2s ease-in-out infinite;transform-origin:50% 100%}
+@keyframes breath{50%{transform:scale(1.03,.96)}}
+.zz{position:absolute;right:18px;top:6px;font-weight:900;color:#1E6B45;font-size:26px;animation:zz 2.1s ease-in infinite;opacity:0}
+@keyframes zz{0%{opacity:0;transform:translate(0,10px) scale(.6)}30%{opacity:1}100%{opacity:0;transform:translate(30px,-46px) scale(1.25)}}
+.wake{animation:wake .6s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes wake{0%{transform:scale(.7) rotate(-8deg);opacity:.2}100%{transform:none;opacity:1}}
+#nap{position:fixed;right:10px;bottom:calc(var(--nav) + 10px + env(safe-area-inset-bottom));z-index:40;width:120px;height:120px;transition:transform .45s cubic-bezier(.2,1.4,.4,1);transform:translateY(170%)}
+#nap.on{transform:none}
+#nap .msc{width:120px;height:120px}
+#nap .zz{right:4px;top:-4px;font-size:20px}
+.fbm{width:70px;height:70px;margin-left:auto;margin-top:-18px;animation:pop .45s cubic-bezier(.2,1.6,.4,1) both;flex:none}
+.hero .msc{width:176px;height:176px;position:relative;animation:heroIn .8s cubic-bezier(.2,1.6,.4,1) both,float 3s ease-in-out .8s infinite}
+.peek{position:absolute;width:88px;height:88px;top:-14px}
+.rkhead{display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#FFE58A,#F5B800);border-radius:22px;padding:14px 16px;color:#3A2800;box-shadow:0 4px 0 var(--gold-d);margin:16px 0 4px;position:relative}
+.rkhead h2{margin:0;font-size:24px;font-weight:900}.rkhead p{margin:2px 0 0;font-size:13.5px;opacity:.85}
+.rkhead .msc{width:112px;height:112px;margin:-40px -8px -18px 0}
+.pav{width:86px;height:86px;flex:none;border-radius:50%;background:radial-gradient(circle at 50% 38%,#FFF6CF,#FFD45C);border:3px solid #fff;box-shadow:0 0 0 2px var(--line),0 4px 10px rgba(0,0,0,.12);overflow:hidden;display:grid;place-items:center}
+.pav .msc{width:100px;height:100px;margin-top:16px}
+.mtip{display:flex;align-items:center;gap:10px;margin:10px 0 0}
+.mtip .msc{width:92px;height:92px;flex:none}
+.mtip .bb{background:var(--card);border:2px solid var(--line);border-radius:16px;padding:10px 14px;font-weight:800;font-size:14.5px;position:relative;box-shadow:0 3px 0 var(--line)}
+.mtip .bb::before{content:"";position:absolute;left:-10px;top:50%;margin-top:-8px;border:8px solid transparent;border-left:0;border-right-color:var(--line)}
 /* ----- yuqori panel ----- */
 .top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:center;gap:4px;padding:8px 12px;border-bottom:2px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px;font-weight:900;font-size:17px;flex:1;min-width:0;white-space:nowrap;overflow:hidden}
@@ -372,7 +411,7 @@ h2.tt{font-size:24px;font-weight:900;margin:4px 0 2px}
  <linearGradient id="gGrass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7ED35A"/><stop offset="1" stop-color="#3F9A33"/></linearGradient>
  <linearGradient id="gWood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E2B27A"/><stop offset="1" stop-color="#A9713E"/></linearGradient>
 </defs></svg>
-<div id="app"><div class="center"><div class="spin"></div></div></div>
+<div id="app"><div class="center"><img class="msc" src="/mascot-walk.webp" alt="" style="width:150px;height:150px;animation:stepB .3s ease-in-out infinite"></div></div>
 <nav class="nav hide" id="nav"></nav>
 <div class="scrim" id="scrim" onclick="closeSheet()"></div>
 <div class="sheet" id="sheet"><div class="in" id="sheetIn"></div></div>
@@ -413,7 +452,9 @@ const RU={'Darslar':'Уроки','Reyting':'Рейтинг','Bogʻ':'Сад','Pr
 'Dalada':'В поле','ta daraxt':'деревьев','Daraxtni bosing — maʼlumot va sugʻorish':'Нажмите на дерево — информация и полив','Suv kerak':'Нужна вода','Navbatdagi nihol':'Следующий росток',
 'Variant tanlash':'Выберите ответ','Eshitib tanlash':'Аудирование','Rasmni tanlash':'Выберите картинку','Toʻgʻri / notoʻgʻri':'Верно / неверно','Javobni yozish':'Напишите ответ',
 'Jumla tuzish':'Составьте предложение','Harflardan soʻz':'Соберите слово','Juftini topish':'Найдите пары','Talaffuz qilish':'Произнесите','Yangi soʻz':'Новое слово',
-'Sekin':'Медленно','Ovoz chiqarib ayting':'Произнесите вслух','Tozalash':'Очистить','Gʻalaba!':'Победа!'};
+'Sekin':'Медленно','Ovoz chiqarib ayting':'Произнесите вслух','Tozalash':'Очистить','Gʻalaba!':'Победа!',
+'seni sogʻindim!':'я по тебе скучал!','Qani, davom etamiz!':'Ну что, продолжим!','Assalomu alaykum':'Ассалому алайкум','Bosing':'Нажмите',
+'Eng koʻp dinor yigʻganlar':'Больше всех динаров','Bogʻni oʻstirishni boshlaymiz!':'Начнём выращивать сад!'};
 const T=s=>LANG==='ru'?(RU[s]||s):s;
 const TL=(s,ru)=>LANG==='ru'&&ru?ru:s;
 function cyr(w){
@@ -504,6 +545,30 @@ const avCol=s=>{let h=0;for(const c of String(s))h=(h*31+c.charCodeAt(0))>>>0;re
 const ini=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
 const fmt=n=>String(Math.round(+n||0)).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
 const isAr=s=>/[؀-ۿ]/.test(String(s||''));
+/* ---------- maskot (Natiq boyqushi) ---------- */
+const MSC=['read','thumbs','cheer','bravo','think','goodjob','cool','party','love','sleep','write','learn','peek','walk','stars','trophy'];
+const MS=(n,cls,st)=>`<img class="msc ${cls||''}" src="/mascot-${n}.webp" alt="" draggable="false" ${st?`style="${st}"`:''}>`;
+const pickOne=a=>a[Math.floor(Math.random()*a.length)];
+function preload(){MSC.forEach(n=>{const i=new Image();i.src='/mascot-'+n+'.webp';});}
+const firstName=()=>String((ME&&ME.user.name)||'').trim().split(/\s+/)[0]||'';
+const daysAgo=d=>d?Math.round((Date.parse(new Date(Date.now()+5*3600e3).toISOString().slice(0,10))-Date.parse(d))/864e5):0;
+/* kirishda: maskot chetdan oʻrtaga yurib keladi; uzoq kirmagan boʻlsa — uxlab yotgan joyidan uygʻonadi */
+let INTRO_T=null;
+function intro(){const away=daysAgo(ME.prog.lastDay)>=2;const nm=firstName();const d=document.createElement('div');d.id='intro';
+ if(away){d.innerHTML=`<div class="stage"><div class="shadow"></div>${MS('sleep','breath')}<span class="zz">z</span><span class="zz" style="animation-delay:.7s">z</span><span class="zz" style="animation-delay:1.4s">Z</span></div><div class="bubble" id="ibub" style="animation-delay:.25s">${esc(nm?nm+', ':'')}${T('seni sogʻindim!')}</div><div class="hint">${T('Bosing')}</div>`;
+  setTimeout(()=>{const s=d.querySelector('.stage');if(!s)return;s.innerHTML=`<div class="shadow"></div>${MS('cheer','wake')}`;const b=$('ibub');if(b){b.textContent=T('Qani, davom etamiz!');b.style.animation='none';void b.offsetWidth;b.style.animation='bub .45s cubic-bezier(.2,1.6,.4,1) both';cyrDom(b);}sfx('pop',0,420);bell(1047,.1,.8,.08);hap('medium');},1800);
+  INTRO_T=setTimeout(closeIntro,3600);}
+ else{d.innerHTML=`<div class="stage walkin"><div class="shadow"></div>${MS('walk','stepb')}</div><div class="bubble">${T('Assalomu alaykum')}${nm?', '+esc(nm):''}! 👋</div><div class="hint">${T('Bosing')}</div>`;
+  try{for(let i=0;i<5;i++)noise(i*.29,.07,700,500,.04);setTimeout(()=>{bell(784,0,.7,.07);bell(1175,.12,.9,.07);},1450);}catch(e){}INTRO_T=setTimeout(closeIntro,3000);}
+ d.onclick=closeIntro;document.body.appendChild(d);cyrDom(d);}
+function closeIntro(){clearTimeout(INTRO_T);const d=$('intro');if(!d||d.classList.contains('out'))return;d.classList.add('out');setTimeout(()=>d.remove(),500);idleReset();}
+/* uzoq tegilmasa — maskot burchakda uxlaydi; tegilsa uygʻonadi */
+let IDLE_T=null;
+function idleReset(){clearTimeout(IDLE_T);const n=$('nap');if(n&&n.classList.contains('on')&&!n.dataset.w)wakeNap();IDLE_T=setTimeout(showNap,45000);}
+function showNap(){if(!ME||$('intro')||$('cine')||!$('ov').classList.contains('hide')||$('sheet').classList.contains('on')){IDLE_T=setTimeout(showNap,15000);return;}
+ let n=$('nap');if(n)return;n=document.createElement('div');n.id='nap';n.innerHTML=MS('sleep','breath')+'<span class="zz">z</span><span class="zz" style="animation-delay:.8s">Z</span>';document.body.appendChild(n);requestAnimationFrame(()=>requestAnimationFrame(()=>n.classList.add('on')));}
+function wakeNap(){const n=$('nap');if(!n)return;n.dataset.w=1;n.innerHTML=MS('cheer','wake');sfx('pop',0,500);setTimeout(()=>{n.classList.remove('on');setTimeout(()=>n.remove(),500);},1300);}
+['pointerdown','keydown','scroll','touchstart'].forEach(e=>addEventListener(e,()=>{if(ME)idleReset();},{passive:true}));
 
 /* ---------- tarmoq ---------- */
 async function api(name,body){
@@ -553,13 +618,13 @@ function theme(){const d=!!(ME&&ME.prog.dark);document.documentElement.classList
  const bg=d?'#13100A':'#FFFCF3';try{TG&&TG.setHeaderColor&&TG.setHeaderColor(bg);TG&&TG.setBackgroundColor&&TG.setBackgroundColor(bg);TG&&TG.setBottomBarColor&&TG.setBottomBarColor(d?'#201B11':'#FFFFFF');}catch(e){}}
 async function boot(){
  try{if(TG){TG.ready();TG.expand();TG.disableVerticalSwipes&&TG.disableVerticalSwipes();}}catch(e){}
- if(!TG||!TG.initData){$('app').innerHTML=`<div class="center">${stk('user','')}<h2 class="tt">${T('Ilovani Telegram orqali oching')}</h2><p class="sub">Natiq Arab</p></div>`;return;}
- try{ME=await api('me');LANG=ME.prog.lang||'uz';theme();if(ME.cfg.primary)document.documentElement.style.setProperty('--gold',ME.cfg.primary);render();
+ if(!TG||!TG.initData){$('app').innerHTML=`<div class="center">${MS('walk','','width:170px;height:170px')}<h2 class="tt">${T('Ilovani Telegram orqali oching')}</h2><p class="sub">Natiq Arab</p></div>`;return;}
+ try{ME=await api('me');LANG=ME.prog.lang||'uz';theme();if(ME.cfg.primary)document.documentElement.style.setProperty('--gold',ME.cfg.primary);preload();render();intro();
    if(ME.sess&&ME.sess.mode==='lesson'&&ME.sess.i>0)setTimeout(()=>offerResume(),300);}
  catch(e){bootErr(e);}
 }
 function bootErr(e){const linked=e.code==='not_linked'||e.code==='blocked';
- $('app').innerHTML=`<div class="center"><div style="width:110px;height:110px">${stk(linked?'crown':'broken')}</div><h2 class="tt">${esc(linked?T('ID kod kerak'):T('Xatolik'))}</h2><p class="sub" style="max-width:320px">${esc(e.message)}</p>
+ $('app').innerHTML=`<div class="center">${MS(linked?'peek':'think','','width:160px;height:160px')}<h2 class="tt">${esc(linked?T('ID kod kerak'):T('Xatolik'))}</h2><p class="sub" style="max-width:320px">${esc(e.message)}</p>
   <div style="width:100%;max-width:320px;display:grid;gap:12px">${linked?`<button class="btn" onclick="TG.close()">${T('Botga oʻtish')}</button>`:`<button class="btn" onclick="location.reload()">${T('Qayta urinish')}</button>`}</div></div>`;
  $('app').querySelectorAll('.stk').forEach(s=>{s.style.width='110px';s.style.height='110px';});cyrDom($('app'));}
 async function refresh(){try{ME=await api('me');theme();render();}catch(e){toast(e.message);}}
@@ -594,7 +659,7 @@ function learnView(){
   L.parts.forEach((pt,i)=>{const done=L.done>=pt.p;const cur=ME.cur&&ME.cur.lid===L.id&&ME.cur.part===pt.p;
    const cls=!pt.ok?'empty':done?'done':pt.open?'cur':'lock';
    const icon=done?IC.check:(!pt.open&&!ME.user.tester)?IC.lock:IC[PART_IC[i]];
-   html+=`<div class="nwrap ${cur?'cw':''}" style="transform:translateX(${(k%2?-1:1)*OFF[i]}px)"><button class="node ${cls}" style="${cls==='done'||cls==='cur'?`background:${col[0]};box-shadow:0 7px 0 ${col[1]},inset 0 4px 0 rgba(255,255,255,.35)`:''}" onclick="partSheet('${L.id}',${pt.p})">${cur?`<span class="ring" style="border-color:${col[0]}44"></span><span class="tip" style="color:${col[1]}">${T('Boshlash')}</span>`:''}${icon}</button><div class="nlab">${T(pt.n)}</div></div>`;});
+   html+=`<div class="nwrap ${cur?'cw':''}" style="position:relative;transform:translateX(${(k%2?-1:1)*OFF[i]}px)">${cur?MS('peek','peek',k%2?'right:-104px;transform:scaleX(-1)':'left:-104px'):''}<button class="node ${cls}" style="${cls==='done'||cls==='cur'?`background:${col[0]};box-shadow:0 7px 0 ${col[1]},inset 0 4px 0 rgba(255,255,255,.35)`:''}" onclick="partSheet('${L.id}',${pt.p})">${cur?`<span class="ring" style="border-color:${col[0]}44"></span><span class="tip" style="color:${col[1]}">${T('Boshlash')}</span>`:''}${icon}</button><div class="nlab">${T(pt.n)}</div></div>`;});
   html+=`</div>`;});
  return html+`</div>`;}
 function partSheet(lid,part){const L=ME.path.find(x=>x.id===lid);if(!L)return;const pt=L.parts[part-1];const done=L.done>=part;const rw=ME.cfg.rw;
@@ -609,7 +674,7 @@ function partSheet(lid,part){const L=ME.path.find(x=>x.id===lid);if(!L)return;co
   <div style="display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 16px">${lines.map(l=>`<span class="pill">${stk('coin')}${l}</span>`).join('')}<span class="pill" style="color:#E5333F">${stk('heart')}${ME.prog.hearts}</span>
   ${done&&!ME.cfg.replayReward?`<span class="pill muted">${T('Takroriy — dinor berilmaydi')}</span>`:''}</div>${act}`);}
 function heartSheet(){const p=ME.prog,mx=ME.cfg.maxHearts;
- openSheet(`<h3>${T('Jon')}</h3><div style="display:flex;gap:4px;margin:10px 0 12px">${Array.from({length:mx},(_,i)=>`<span style="width:44px;height:44px;opacity:${i<p.hearts?1:.25};filter:${i<p.hearts?'none':'grayscale(1)'}">${stk('heart')}</span>`).join('')}</div>
+ openSheet(`<div style="float:right;margin:-8px -4px 0 0">${MS('love','','width:96px;height:96px')}</div><h3>${T('Jon')}</h3><div style="display:flex;gap:4px;margin:10px 0 12px">${Array.from({length:mx},(_,i)=>`<span style="width:44px;height:44px;opacity:${i<p.hearts?1:.25};filter:${i<p.hearts?'none':'grayscale(1)'}">${stk('heart')}</span>`).join('')}</div>
   <p class="muted" style="margin:0 0 16px">Xato javob 1 ta jonni oladi. Jon tugasa qism toʻxtaydi va dinor berilmaydi. ${ME.cfg.reviewQ} ${T('savol')}lik takrorlashda ${T('2 ta toʻgʻri javob = 1 jon')}.</p>
   ${p.hearts<mx?`<button class="btn bad" onclick="closeSheet();startReview('heart')">${T('Takrorlash — jon olish')}</button>`:`<button class="btn ghost" onclick="closeSheet()">${T('Yopish')}</button>`}`);
  $('sheetIn').querySelectorAll('span>.stk').forEach(s=>{s.style.width='44px';s.style.height='44px';});}
@@ -740,13 +805,14 @@ async function send(extra){const s=SESS;let r;
  else if(it.type==='type'){const t=$('tx');t.disabled=true;t.style.borderColor=r.correct?'#7FDB9C':'#FF9F9F';shown=r.answer;}
  const f=$('foot');f.classList.add(r.correct?'good':'wrong');
  f.querySelector('.in').innerHTML=`<div class="fb"><span class="ic">${r.correct?IC.check.replace('<svg','<svg style="color:var(--ok)"'):IC.x.replace('<svg','<svg style="color:var(--bad)"')}</span><div>${r.correct?T('Barakalla!')+(s.pay?` <span style="font-size:16px;display:inline-flex;align-items:center;vertical-align:middle">+${ME.cfg.rw.q} ${stk('coin').replace('class="stk','style="width:24px;height:24px" class="stk')}</span>`:''):T('Notoʻgʻri')}
-  ${!r.correct&&shown?`<small>${it.type==='match'?T('Toʻgʻri juftlar:'):T('Toʻgʻri javob:')} <span class="${isAr(shown)&&it.type!=='match'?'ar':''}" style="font-size:${isAr(shown)&&it.type!=='match'?'22px':'15px'}">${esc(shown)}</span></small>`:''}</div></div>
+  ${!r.correct&&shown?`<small>${it.type==='match'?T('Toʻgʻri juftlar:'):T('Toʻgʻri javob:')} <span class="${isAr(shown)&&it.type!=='match'?'ar':''}" style="font-size:${isAr(shown)&&it.type!=='match'?'22px':'15px'}">${esc(shown)}</span></small>`:''}</div>
+  ${MS(r.correct?pickOne(['thumbs','cheer','stars','goodjob','bravo']):'think','fbm')}</div>
   <button class="btn ${r.correct?'ok':'bad'}" onclick="next()">${T('Davom etish')}</button>`;cyrDom(f);}
 function next(){const s=SESS,r=LAST;if(!s)return;
  if(r&&r.fail){failScreen(r);return;}
  if(r&&r.end){endScreen(r);return;}
  s.i++;drawItem();}
-function failScreen(r){$('ov').innerHTML=`<div class="body"><div class="res"><div class="hero" style="filter:grayscale(.15)">${stk('broken')}</div><h2>${T('Jonlar tugadi')}</h2><p class="muted">${T('Bu bosqich uchun dinor berilmadi.')}${r.lost?` (−${r.lost})`:''}</p>
+function failScreen(r){$('ov').innerHTML=`<div class="body"><div class="res"><div class="hero">${MS('think')}</div><h2>${T('Jonlar tugadi')}</h2><p class="muted">${T('Bu bosqich uchun dinor berilmadi.')}${r.lost?` (−${r.lost})`:''}</p>
   <p class="muted" style="font-size:14px">${ME.cfg.reviewQ} ${T('savol')} · ${T('2 ta toʻgʻri javob = 1 jon')}</p></div></div>
   <div class="foot"><div class="in" style="display:grid;gap:12px"><button class="btn bad" onclick="closeOv();startReview('heart')">${T('Takrorlash — jon olish')}</button><button class="btn ghost" onclick="closeOv();refresh()">${T('Darslarga qaytish')}</button></div></div>`;cyrDom($('ov'));hap('err');sfx('fail');}
 /* bayram effekti: konfetti + tangalar */
@@ -754,18 +820,18 @@ function fxBurst(coins){const fx=document.createElement('div');fx.className='fx'
  for(let i=0;i<70;i++){const d=2+Math.random()*2.2;h+=`<i class="cf" style="left:${Math.random()*100}%;background:${C[i%C.length]};animation-duration:${d}s;animation-delay:${Math.random()*.6}s;--dx:${(Math.random()-.5)*160}px;--r:${(Math.random()-.5)*900}deg;${i%3?'':'border-radius:50%;width:10px;height:10px;'}"></i>`;}
  for(let i=0;i<(coins||0);i++){const a=Math.random()*Math.PI*2,R=110+Math.random()*130;h+=`<span class="cn" style="--x:${Math.cos(a)*R}px;--y:${Math.sin(a)*R-60}px;--r:${(Math.random()-.5)*540}deg;animation-delay:${.1+i*.05}s">${stk('coin')}</span>`;}
  fx.innerHTML=h;document.body.appendChild(fx);fx.querySelectorAll('.cn .stk').forEach(s=>{s.style.width='38px';s.style.height='38px';});setTimeout(()=>fx.remove(),4800);}
-function endScreen(r){const e=r.end;let hero='trophy',h=T('Qism tugadi!'),extra='',chips='';
+function endScreen(r){const e=r.end;let hero=pickOne(['bravo','goodjob','party','cheer']),h=T('Qism tugadi!'),extra='',chips='';
  const chip=(c,lab,val,ico,d)=>`<div class="rc" style="animation-delay:${d||.3}s"><b style="background:${c}">${lab}</b><span>${ico?stk(ico):''}${val}</span></div>`;
  if(e.mode==='lesson'){chips=chip('#D08A00',T('Dinor'),'+'+e.gain,'coin',.5)+(e.total?chip('#1E9E48',T('Toʻgʻri'),`${e.ok}/${e.total}`,'star',.65):'');
   if(e.tree&&e.tree.grew)extra=`<p style="font-size:17px;font-weight:900;margin:6px 0;display:flex;align-items:center;justify-content:center;gap:6px">${stk('sprout').replace('class="stk','style="width:34px;height:34px" class="stk')} ${T(e.tree.msg)}!</p>`;
   if(e.replay&&!e.gain)extra+=`<p class="muted">${T('Takroriy — dinor berilmaydi')}</p>`;
   setTimeout(()=>{fxBurst(e.gain>0?14:0);sfx('fanfare');},150);}
- else if(e.mode==='heart'){hero='heart';h=T('Natija');chips=chip('#E5333F',T('Jon olindi'),'+'+e.hearts,'heart')+chip('#1E9E48',T('Toʻgʻri'),`${e.ok}/${e.total}`,'star',.45);if(e.hearts>0){setTimeout(()=>{fxBurst(0);sfx('fanfare');},150);}else sfx('fail');}
- else {hero=e.watered?'drop':'wilt';h=e.watered?(e.tree&&e.tree.revived?T('Daraxt qayta tirildi!'):T('Daraxt sugʻorildi!')):T('Yetarli emas');
+ else if(e.mode==='heart'){hero='love';h=T('Natija');chips=chip('#E5333F',T('Jon olindi'),'+'+e.hearts,'heart')+chip('#1E9E48',T('Toʻgʻri'),`${e.ok}/${e.total}`,'star',.45);if(e.hearts>0){setTimeout(()=>{fxBurst(0);sfx('fanfare');},150);}else sfx('fail');}
+ else {hero=e.watered?'stars':'think';h=e.watered?(e.tree&&e.tree.revived?T('Daraxt qayta tirildi!'):T('Daraxt sugʻorildi!')):T('Yetarli emas');
   chips=chip('#1E9E48',T('Toʻgʻri'),`${e.ok}/${e.total}`,'star')+(e.watered&&e.tree&&e.tree.added?chip('#E5333F',T('Meva'),'+'+e.tree.added,'apple',.45):'');
   if(!e.watered){extra=`<p class="muted">Kamida ${e.need} ta toʻgʻri javob kerak.</p>`;sfx('fail');}else{setTimeout(()=>{fxBurst(0);sfx('fanfare');},150);}}
  const lid=SESS.lid;END=e;
- $('ov').innerHTML=`<div class="body"><div class="res"><div class="hero">${stk(hero)}</div><h2 class="pop" style="animation-delay:.25s">${h}</h2><div class="chips">${chips}</div>${extra}</div></div>
+ $('ov').innerHTML=`<div class="body"><div class="res"><div class="hero">${MS(hero)}</div><h2 class="pop" style="animation-delay:.25s">${h}</h2><div class="chips">${chips}</div>${extra}</div></div>
   <div class="foot"><div class="in" style="display:grid;gap:12px">${e.mode==='water'&&!e.watered?`<button class="btn blue" onclick="closeOv();startReview('water','${lid}')">${T('Yana urinish')}</button>`:''}<button class="btn ok" onclick="afterEnd()">${T('Davom etish')}</button></div></div>`;
  cyrDom($('ov'));hap('ok');}
 let END=null;
@@ -817,7 +883,7 @@ function scrollField(){const f=document.querySelector('.field');if(f)f.scrollLef
 function gardenView(){const G=ME.garden,C=ME.cfg;const L=id=>ME.path.find(x=>x.id===id)||{};
  let h=`<div class="wrap"><h2 class="tt">${T('Bogʻ')}</h2>
   <div class="gstats"><div class="gs"><b>${stk('tree')}${G.count}</b><span>${T('Daraxt')}</span></div><div class="gs"><b>${stk('apple')}${G.fruit}</b><span>${T('Meva')}</span></div><div class="gs"><b>${stk('wilt')}${G.dry}</b><span>${T('Quridi')}</span></div></div>
-  <div class="field">${fieldSvg(G)}</div><div class="fhint">${G.trees.length?T('Daraxtni bosing — maʼlumot va sugʻorish'):T('Harfning 1-qismini tugating — dalaga nihol ekiladi.')}</div>`;
+  <div class="field">${fieldSvg(G)}</div>${G.trees.length?`<div class="fhint">${T('Daraxtni bosing — maʼlumot va sugʻorish')}</div>`:`<div class="mtip">${MS('learn')}<div class="bb">${T('Bogʻni oʻstirishni boshlaymiz!')} ${T('Harfning 1-qismini tugating — dalaga nihol ekiladi.')}</div></div>`}`;
  if(G.sellable>0)h+=`<div class="card" style="margin-bottom:12px;display:flex;align-items:center;gap:12px">${stk('apple').replace('class="stk','style="width:46px;height:46px" class="stk')}<div class="grow"><b>${T('Mevalarni sotish')}</b><div class="muted" style="font-size:13px;display:flex;align-items:center;gap:2px">${G.sellable} × ${C.fruitPrice} = <b class="price" style="font-size:14px">${stk('coin')}${fmt(G.sellable*C.fruitPrice)}</b></div></div><button class="btn sm ok" onclick="sellFruit()">${T('Sotish')}</button></div>`;
  const thirsty=G.trees.filter(t=>t.dry||(t.stage>=5&&t.water&&t.water.can));
  if(thirsty.length)h+=`<div class="thirst">${thirsty.map(t=>`<div class="th"><div class="ar">${esc(L(t.lid).letter||'')}</div><div style="font-size:12px" class="${t.dry?'':'muted'}">${t.dry?T('Suv kerak'):'+'+C.waterFruit+' '+T('Meva')}</div><button class="btn blue" onclick="startReview('water','${t.lid}')">${stk('drop').replace('class="stk','style="width:20px;height:20px" class="stk')} ${T('Sugʻorish')}</button></div>`).join('')}</div>`;
@@ -855,7 +921,7 @@ function playCine2(stage,fruit){const full=stage>=5;const from=full?1:Math.max(1
   <g class="cam"><rect x="-200" y="520" width="800" height="300" fill="url(#gGrass)"/><g transform="translate(200 560) scale(2.5)"><ellipse cx="0" cy="3" rx="40" ry="7" fill="#1B3A0F" opacity=".2"/><ellipse cx="0" cy="-1" rx="22" ry="7" fill="url(#gSoil)"/>${st}${ap}${sp}${lv}</g></g>
   <g class="par3">${Array.from({length:14},(_,i)=>`<path d="M${i*31} 700l-6-34M${i*31+6} 700l2-40M${i*31+12} 700l8-30" stroke="#3E9B3E" stroke-width="5" stroke-linecap="round"/>`).join('')}</g></svg>
   <button class="skip" onclick="endCine()">${T('Oʻtkazib yuborish')}</button>
-  <div class="cap"><h2 style="animation-delay:${total-.4}s">${full?T('Daraxtingiz meva soldi!'):T(['','Nihol ekildi','Unib chiqdi','Nihol boʻldi','Daraxt boʻldi','Meva soldi'][stage])+'!'}</h2>
+  <div class="cap">${MS(full?'trophy':'cheer','',`width:${full?150:120}px;height:${full?150:120}px;margin:0 auto 4px;opacity:0;animation:capIn .6s cubic-bezier(.2,1.6,.4,1) ${total-.6}s both`)}<h2 style="animation-delay:${total-.4}s">${full?T('Daraxtingiz meva soldi!'):T(['','Nihol ekildi','Unib chiqdi','Nihol boʻldi','Daraxt boʻldi','Meva soldi'][stage])+'!'}</h2>
    ${full?`<p style="animation-delay:${total-.2}s">+${fruit||3} ${T('Meva')} · ${T('Dalada')} ${ME.garden.count} ${T('ta daraxt')}</p>`:'<p></p>'}<button class="btn" style="animation-delay:${total}s" onclick="endCine()">${T('Ajoyib!')}</button></div>`;
  document.body.appendChild(d);cyrDom(d);backBtn();hap('medium');
  sfx('grow',n,step);if(full)sfx('fruit',tA,nA);
@@ -864,9 +930,9 @@ function endCine(){clearTimeout(CINE_T);const d=$('cine');if(d){const v=d.queryS
 /* ---------- Reyting ---------- */
 async function loadRating(){try{RATING=await api('rating');if(TAB==='rank')render();}catch(e){toast(e.message);}}
 function rankView(){const R=RATING;
- let h=`<div class="wrap"><h2 class="tt">${T('Reyting')}</h2><p class="sub">${T('Dinor boʻyicha')}</p>`;
+ let h=`<div class="wrap"><div class="rkhead"><div class="grow"><h2>${T('Reyting')}</h2><p>${T('Eng koʻp dinor yigʻganlar')}</p></div>${MS('trophy')}</div>`;
  if(!R)return h+`<div class="center" style="min-height:40vh"><div class="spin"></div></div></div>`;
- if(!R.top.length)return h+`<div class="empty">${stk('trophy')}<p>${T('Hali hech kim yoʻq')}</p></div></div>`;
+ if(!R.top.length)return h+`<div class="empty">${MS('cheer','','width:150px;height:150px;margin:0 auto')}<p>${T('Hali hech kim yoʻq')}</p></div></div>`;
  const t=R.top;const pod=[t[1],t[0],t[2]];const H=[96,128,74];const C=['linear-gradient(#D7DEE6,#A9B4C0)','linear-gradient(#FFD84D,#F0A800)','linear-gradient(#F2B987,#C97A3E)'];
  h+=`<div class="podium">${pod.map((x,i)=>x?`<div class="pd"><div class="av ${i===1?'lg':''}" style="background:${avCol(x.name)}">${i===1?stk('crown','crown'):''}${esc(ini(x.name))}</div>
    <div class="nm">${esc(x.name)}${x.me?` (${T('Siz')})`:''}</div><div class="sc">${stk('coin')}${fmt(x.dinor)}</div><div class="base" style="height:${H[i]}px;background:${C[i]}">${x.rank}</div></div>`:'<div></div>').join('')}</div>`;
@@ -887,7 +953,8 @@ function nextLesson(g){const days=(Array.isArray(g.days)?g.days:String(g.days||'
 function profileView(){
  if(SUB==='market')return marketView();if(SUB==='orders')return ordersView();
  const u=ME.user,p=ME.prog,G=ME.garden,g=u.group;const chev=IC.chev.replace('<svg','<svg class="chev"');
- let h=`<div class="wrap"><div class="phead"><div class="av lg" style="background:${avCol(u.name)}">${esc(ini(u.name))}</div><div class="grow"><h2 class="tt" style="margin:0">${esc(u.name)}</h2>
+ const mood=p.hearts<=0?'think':p.streak>=3?'cool':p.lessons>=3?'stars':'read';
+ let h=`<div class="wrap"><div class="phead"><div class="pav">${MS(mood)}</div><div class="grow"><h2 class="tt" style="margin:0">${esc(u.name)}</h2>
   <div class="muted" style="font-size:13px;margin-top:4px">${T('ID')}: <span class="code nt">${esc(u.code)}</span>${g?` · ${esc(g.name)}`:''}</div></div></div>
   <div class="sgrid"><div class="sg">${stk('flame')}<div><b>${p.days}</b><span>${T('Faol kun')}${p.streak>1?` · ${p.streak}🔥`:''}</span></div></div>
    <div class="sg">${stk('coin')}<div><b>${fmt(p.dinor)}</b><span>${T('Dinor')}</span></div></div>
@@ -914,7 +981,7 @@ async function loadOrders(){try{ORDERS=await api('orders');if(SUB==='orders')ren
 const backH=()=>`<button class="back" onclick="SUB=null;render()">${IC.back}${T('Orqaga')}</button>`;
 function marketView(){let h=`<div class="wrap">${backH()}<h2 class="tt">${T('Market')}</h2><p class="sub" style="display:flex;align-items:center;gap:2px">${stk('coin').replace('class="stk','style="width:24px;height:24px" class="stk')} ${fmt(ME.prog.dinor)} ${T('Dinor')}</p>`;
  if(!MARKET)return h+`<div class="center" style="min-height:40vh"><div class="spin"></div></div></div>`;
- if(!MARKET.items.length)return h+`<div class="empty">${stk('bag')}<p>${T('Mahsulotlar hali yoʻq')}</p></div></div>`;
+ if(!MARKET.items.length)return h+`<div class="empty">${MS('think','','width:140px;height:140px;margin:0 auto')}<p>${T('Mahsulotlar hali yoʻq')}</p></div></div>`;
  return h+`<div class="mgrid">${MARKET.items.map(x=>`<button class="prod" onclick="prodSheet('${x.id}')"><div class="im" style="${x.img?`background-image:url('${esc(x.img)}')`:''}">${x.img?'':stk('gift')}</div><div class="pi"><div class="pn">${esc(x.name)}</div><div class="price">${stk('coin')}${fmt(x.price)}</div>${x.stock===0?`<div class="muted" style="font-size:12px">${T('Tugagan')}</div>`:''}</div></button>`).join('')}</div></div>`;}
 function prodSheet(id){const x=MARKET.items.find(i=>i.id===id);if(!x)return;const can=ME.prog.dinor>=x.price&&x.stock!==0;
  openSheet(`${x.img?`<img src="${esc(x.img)}" alt="" style="width:100%;max-height:260px;object-fit:cover;border-radius:18px;border:2px solid var(--line)">`:`<div style="text-align:center">${stk('gift').replace('class="stk','style="width:120px;height:120px" class="stk')}</div>`}<h3 style="margin-top:12px">${esc(x.name)}</h3>
@@ -924,12 +991,12 @@ function prodSheet(id){const x=MARKET.items.find(i=>i.id===id);if(!x)return;cons
 function buyStep(id){const ph=ME.user.phone||'';$('buyBox').innerHTML=`<label class="muted" style="font-size:13px">${T('Telefon raqamingiz')}</label><input class="inp" id="bph" type="tel" inputmode="tel" value="${esc(ph)}" placeholder="+998 90 123 45 67" style="margin:6px 0 10px">
   <p class="muted" style="font-size:13px;margin:0 0 12px">${T('Operator siz bilan bogʻlanib, yetkazib berishni kelishadi.')}</p><button class="btn ok" id="bgo" onclick="buy('${id}')">${T('Tasdiqlash')}</button>`;cyrDom($('buyBox'));}
 async function buy(id){const b=$('bgo');b.disabled=true;try{const r=await api('buy',{pid:id,phone:$('bph').value});ME.prog.dinor=r.dinor;hap('ok');sfx('fanfare');fxBurst(0);
-  $('sheetIn').innerHTML=`<div class="grab"></div><div class="res"><div class="hero">${stk('gift')}</div><h2>${T('Buyurtma qabul qilindi!')}</h2><p class="muted">${T('Operator siz bilan bogʻlanib, yetkazib berishni kelishadi.')}</p></div><button class="btn" onclick="closeSheet();openSub('orders')">${T('Buyurtmalarim')}</button>`;cyrDom($('sheetIn'));MARKET=null;loadMarket();}
+  $('sheetIn').innerHTML=`<div class="grab"></div><div class="res"><div class="hero">${MS('party')}</div><h2>${T('Buyurtma qabul qilindi!')}</h2><p class="muted">${T('Operator siz bilan bogʻlanib, yetkazib berishni kelishadi.')}</p></div><button class="btn" onclick="closeSheet();openSub('orders')">${T('Buyurtmalarim')}</button>`;cyrDom($('sheetIn'));MARKET=null;loadMarket();}
  catch(e){b.disabled=false;toast(e.message);}}
 const OST={new:['Yangi','#2F8CFF'],called:['Qoʻngʻiroq qilindi','#9B5CF6'],delivered:['Yetkazildi','#2EC45E'],cancelled:['Bekor qilindi','#8C7B58'],refunded:['Pul qaytarildi','#FF7A45'],refund:['Pul qaytarildi','#FF7A45']};
 function ordersView(){let h=`<div class="wrap">${backH()}<h2 class="tt">${T('Buyurtmalarim')}</h2>`;
  if(!ORDERS)return h+`<div class="center" style="min-height:40vh"><div class="spin"></div></div></div>`;
- if(!ORDERS.items.length)return h+`<div class="empty">${stk('box')}<p>${T('Buyurtmalar yoʻq')}</p></div></div>`;
+ if(!ORDERS.items.length)return h+`<div class="empty">${MS('think','','width:140px;height:140px;margin:0 auto')}<p>${T('Buyurtmalar yoʻq')}</p></div></div>`;
  return h+`<div class="list">${ORDERS.items.map(o=>{const s=OST[o.status]||[o.status,'#8C7B58'];return `<div class="ord">${stk('box').replace('class="stk','style="width:36px;height:36px" class="stk')}<div class="grow"><b>${esc(o.productName)}</b><div class="muted" style="font-size:12.5px">${esc(String(o.at).slice(0,10).split('-').reverse().join('.'))} · ${fmt(o.price)} dinor</div></div><span class="st" style="background:${s[1]}22;color:${s[1]}">${T(s[0])}</span></div>`;}).join('')}</div></div>`;}
 
 boot();

@@ -14,6 +14,7 @@ boshqaruv esa natiq.uz → **Mini ilova** boʻlimida.
 | `quiz.js` | 9 xil mashq turi va javobni serverda tekshirish |
 | `store.js` | Supabase bilan ishlash |
 | `app.html` | Mini App (oʻquvchi koʻradigan ilova) |
+| `mascot-*.webp`, `mascot-*.jpg` | Natiq boyqushi (maskot): ilova uchun webp, Telegram uchun jpg — shu papkada turishi shart |
 | `test.js` | Sinovlar: `npm test` |
 
 ## Railway’ga qoʻyish (yangi servis)
@@ -44,3 +45,8 @@ Jumla tuzish (soʻz plitkalari) · Harflardan soʻz · Juftini topish · Talaffu
 ## Animatsiyalar
 Qism tugaganda — konfetti, tangalar va ovozli tabrik. Daraxt oʻsganda — harakatli sahna (nihol → daraxt → meva) ovoz bilan.
 Saytda «Sozlamalar»ga oʻz videongizni (MP4) yuklasangiz, daraxt meva solganda shu video koʻrsatiladi.
+
+## Maskot
+Ilovaga kirganda boyqush chetdan yurib keladi (2+ kun kirmagan boʻlsa — uxlab yotgan joyidan uygʻonadi), javoblarda, qism tugaganda («Bravo»),
+reyting va profilda chiqadi, 45 soniya tegilmasa burchakda uxlaydi. 2 kun darsga kirmagan oʻquvchiga 3-kuni bot maskot rasmi va admin yozgan xabarni yuboradi
+(saytda: Mini ilova → Sozlamalar → «Maskot eslatmasi»).

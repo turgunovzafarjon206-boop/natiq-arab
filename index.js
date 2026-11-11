@@ -15,12 +15,18 @@ const { createArabBot } = require('./bot');
 /* GitHub’da fayllar bir papkada (app.html index.js yonida) yoki public/ ichida boʻlishi mumkin */
 const APP_FILE = [path.join(__dirname, 'app.html'), path.join(__dirname, '..', 'public', 'app.html')].find(f => fs.existsSync(f)) || path.join(__dirname, 'app.html');
 
+/* maskot rasmlari (mascot-<nom>.webp / .jpg) — app.html bilan bir papkada */
+const MASCOTS = ['read', 'thumbs', 'cheer', 'bravo', 'think', 'goodjob', 'cool', 'party', 'love', 'sleep', 'write', 'learn', 'peek', 'walk', 'stars', 'trophy'];
+const assetPath = f => [path.join(__dirname, f), path.join(__dirname, '..', 'public', f)].find(x => fs.existsSync(x)) || null;
+
 function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), info = () => ({}) }) {
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x'); const p = url.pathname.replace(/\/+$/, '') || '/';
     const send = (st, body, type = 'application/json; charset=utf-8', extra = {}) => { res.writeHead(st, Object.assign({ 'Content-Type': type, 'X-Content-Type-Options': 'nosniff' }, extra)); res.end(body); };
     try {
       if (req.method === 'GET' && (p === '/health' || p === '/')) return send(200, JSON.stringify(Object.assign({ ok: true, app: 'natiq-arab' }, info())));
+      const m = /^\/mascot-([a-z]+)\.(webp|jpg|png)$/.exec(p);
+      if (req.method === 'GET' && m && MASCOTS.includes(m[1])) { const f = assetPath(`mascot-${m[1]}.${m[2]}`); if (f) return send(200, fs.readFileSync(f), { webp: 'image/webp', jpg: 'image/jpeg', png: 'image/png' }[m[2]], { 'Cache-Control': 'public, max-age=604800' }); }
       if (req.method === 'GET' && p === '/app') return send(200, appHtml(), 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache' });
       if (req.method === 'POST' && p.startsWith('/api/')) {
         let body = ''; let big = false;
@@ -46,7 +52,7 @@ async function main() {
 
   let A;
   const api = createApi({ store, token, onOrder: o => A && A.notifyOrder(o) });
-  A = createArabBot({ token, store, appUrl, cfg: () => api.cfg() });
+  A = createArabBot({ token, store, appUrl, cfg: () => api.cfg(), asset: assetPath });
   const bot = A.bot;
   await bot.init();
   const started = new Date().toISOString();
@@ -63,6 +69,9 @@ async function main() {
       for (const c of codes) await api.lock(c, () => api.applyOps(c)); } catch (e) { console.error('ops', e.message); }
     busy = false; };
   setInterval(tick, 10000); setTimeout(tick, 3000);
+  /* 2 kun darsga kirmagan oʻquvchiga 3-kuni maskot eslatmasi (Toshkent vaqti 10:00–20:00) */
+  const remind = async () => { try { const n = await A.processReminders(); if (n) console.log('eslatma:', n); } catch (e) { console.error('remind', e.message); } };
+  setInterval(remind, 30 * 60e3); setTimeout(remind, 60e3);
   const beat = async () => { try { await store.put('ar_cfg', 'bot', { at: new Date().toISOString(), username: bot.botInfo.username, appUrl, started }); } catch (e) { console.error('beat', e.message); } };
   beat(); setInterval(beat, 60000);
 
@@ -72,4 +81,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(e => { console.error(e); process.exit(1); });
-module.exports = { createServer };
+module.exports = { createServer, MASCOTS, assetPath };

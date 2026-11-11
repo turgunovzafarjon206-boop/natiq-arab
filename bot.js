@@ -1,7 +1,7 @@
 /* Telegram bot: /start → telefon raqam → 6 xonali ID kod → Mini App tugmasi.
    ID kod faqat birinchi kiritgan Telegram akkauntga biriktiriladi; boshqa akkauntdan
    foydalanish uchun admin «boshqa qurilmaga ruxsat» (allowRebind) berishi kerak. */
-const { Bot, GrammyError } = require('grammy');
+const { Bot, GrammyError, InputFile } = require('grammy');
 const G = require('./game');
 
 const CYR = { А: 'A', В: 'B', Е: 'E', К: 'K', М: 'M', Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T', Х: 'X', У: 'Y', Ж: 'J' };
@@ -11,10 +11,14 @@ const digits = s => String(s || '').replace(/\D/g, '');
 const tgName = u => [u.first_name, u.last_name].filter(Boolean).join(' ');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new Date() }) {
+function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new Date(), asset = () => null }) {
   const bot = new Bot(token, botOpts);
   const getCfg = cfg || (async () => G.cfgOf(await store.get('ar_cfg', 'main')));
   const now = () => clock().toISOString();
+  /* maskot rasmi: birinchi yuborishda fayl yuklanadi, keyin Telegram file_id qayta ishlatiladi */
+  const fileIds = new Map();
+  const mascot = name => { if (fileIds.has(name)) return fileIds.get(name); const f = asset(`mascot-${name}.jpg`); return f ? new InputFile(f) : null; };
+  const remember = (name, msg) => { try { const ph = msg && msg.photo; if (ph && ph.length) fileIds.set(name, ph[ph.length - 1].file_id); } catch (e) { } };
 
   const appBtn = (C, styled = true) => ({ inline_keyboard: [[Object.assign({ text: '📚 ' + (C.botBtn || 'Arab tili'), web_app: { url: appUrl } }, styled ? { style: 'primary' } : {})]] });
   async function setMenu(chatId, C) {
@@ -28,8 +32,9 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     const C = await getCfg();
     const text = String(C.welcomeText || G.DEF_CFG.welcomeText).replace(/\{ism\}/g, c.name || tgName(ctx.from) || '');
     if (!appUrl) return ctx.reply(text + '\n\n⚠️ Ilova manzili (APP_URL) hali sozlanmagan.');
-    const send = async styled => C.welcomeImg
-      ? ctx.replyWithPhoto(C.welcomeImg, { caption: text.slice(0, 1024), reply_markup: appBtn(C, styled) })
+    const pic = C.welcomeImg || mascot('walk');
+    const send = async styled => pic
+      ? ctx.replyWithPhoto(pic, { caption: text.slice(0, 1024), reply_markup: appBtn(C, styled) }).then(m => { if (!C.welcomeImg) remember('walk', m); return m; })
       : ctx.reply(text, { reply_markup: appBtn(C, styled) });
     try { await send(true); }
     catch (e) {   // eski Telegram yoki rasm ochilmasa — oddiy tugma / rasmsiz
@@ -135,8 +140,37 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     return M.length;
   }
 
+  /* eslatma: oxirgi faol kundan keyin remindDays kun oʻtsa (2 kun kirmasa — 3-kuni) maskot bilan xabar */
+  async function processReminders(force) {
+    const C = await getCfg(); if (C.remindOn === false) return 0;
+    const t = clock(); const h = new Date(t.getTime() + 5 * 3600e3).getUTCHours(); if (!force && (h < 10 || h >= 20)) return 0;
+    const today = G.tzDate(t); const days = Math.max(1, +C.remindDays || 2); const rep = Math.max(0, +C.remindRepeat || 0);
+    const codes = (await store.list('ar_codes', { fresh: true })).filter(c => c.status === 'active' && c.tgId);
+    const progs = new Map((await store.list('ar_prog', { fresh: true })).map(p => [p.id, p]));
+    const diff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+    let sent = 0;
+    for (const c of codes) {
+      const p = progs.get(c.id) || {}; const last = p.lastDay || (c.activatedAt ? G.tzDate(new Date(c.activatedAt)) : ''); if (!last) continue;
+      if (diff(last, today) <= days) continue;                       // 2 kun kirmadi → 3-kuni
+      const tg = (await store.get('ar_tg', c.tgId)) || {};
+      if (tg.remindFor === last && !(rep && tg.remindAt && diff(String(tg.remindAt).slice(0, 10), today) >= rep)) continue;
+      const name = String(c.name || p.name || tg.name || '').split(' ')[0];
+      const text = String(C.remindText || G.DEF_CFG.remindText).replace(/\{ism\}/g, name).replace(/\{kun\}/g, String(diff(last, today)));
+      const mk = G.MASCOTS.includes(C.remindMascot) ? C.remindMascot : 'learn'; const pic = mascot(mk);
+      const rm = appUrl ? appBtn(C, false) : undefined;
+      try {
+        if (pic) { const m = await bot.api.sendPhoto(c.tgId, pic, { caption: text.slice(0, 1024), reply_markup: rm }); remember(mk, m); }
+        else await bot.api.sendMessage(c.tgId, text, { reply_markup: rm });
+        sent++;
+      } catch (e) { console.error('eslatma', c.id, e.message); }
+      await store.put('ar_tg', c.tgId, Object.assign(tg, { remindFor: last, remindAt: today }));
+      await sleep(60);
+    }
+    return sent;
+  }
+
   bot.catch(err => console.error('bot xatosi:', err.error && err.error.message || err.message));
-  return { bot, welcome, notifyOrder, processMsgs, normCode, setMenu };
+  return { bot, welcome, notifyOrder, processMsgs, processReminders, normCode, setMenu };
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
 

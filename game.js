@@ -14,7 +14,10 @@ const DEF_CFG = {
   fruitStart: 3, witherAfter: 4, fruitPrice: 2,          // 5-qismda 3 meva; keyingi 4 daraxt meva solsa — quriydi
   rw: { video: 3, q: 1, card: 1 }, replayReward: false, finalMax: 15,
   notifyChats: '', support: '', treeVideo: '',
+  remindOn: true, remindDays: 2, remindRepeat: 0, remindMascot: 'learn',
+  remindText: '{ism}, seni sogʻindim! 🦉\n{kun} kundan beri darsga kirmading. Bugun atigi 5 daqiqa ajrat — jonlaringni toʻldir, dinor yigʻ va bogʻingni sugʻor! 🌳',
 };
+const MASCOTS = ['read', 'thumbs', 'cheer', 'bravo', 'think', 'goodjob', 'cool', 'party', 'love', 'sleep', 'write', 'learn', 'peek', 'walk', 'stars', 'trophy'];
 const PARTS = [
   { k: 'video', n: 'Video dars' }, { k: 'rules', n: 'Qoidalar' }, { k: 'cards', n: 'Talaffuz' },
   { k: 'final', n: 'Yakuniy test' }, { k: 'vocab', n: 'Lugʻat' },
@@ -271,5 +274,5 @@ function applyOp(prog, op, cfg) {
   return true;
 }
 
-module.exports = { Q, DEF_CFG, PARTS, STAGES, cfgOf, tzDate, shuffle, sorted, freshProg, normQ, wordQs, cardQs, partItems, partTests, hasContent, unlocked, current,
+module.exports = { Q, MASCOTS, DEF_CFG, PARTS, STAGES, cfgOf, tzDate, shuffle, sorted, freshProg, normQ, wordQs, cardQs, partItems, partTests, hasContent, unlocked, current,
   markDay, reviewPool, startLesson, startReview, step, finish, grow, isDry, waterState, water, garden, sell, rating, applyOp, sessPublic, uid: sid };
