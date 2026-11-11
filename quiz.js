@@ -45,7 +45,7 @@ function validQ(q) {
     case 'build': return tokens(q.words).length > 0;
     case 'spell': return graphemes(q.words).length > 1;
     case 'match': return q.pairs.length >= 2 && new Set(q.pairs.map(p => p[1])).size === q.pairs.length;
-    case 'speak': return !!(q.ar || q.say || q.audio);
+    case 'speak': return false;   // mikrofon bilan aytish mashqlari oʻchirilgan
     default: return q.opts && q.opts.length >= 2;
   }
 }

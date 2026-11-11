@@ -43,7 +43,7 @@ Tekshirish: `https://<domen>/health` → `{"ok":true,…}`. natiq.uz → Mini il
 
 ## Mashq turlari (saytda «Darslar → Tahrirlash → Mashq qoʻshish»)
 Variant tanlash · Eshitib tanlash · Rasmni tanlash · Toʻgʻri/notoʻgʻri · Javobni yozish (lotin yoki ekrandagi arabcha klaviatura) ·
-Jumla tuzish (soʻz plitkalari) · Harflardan soʻz · Juftini topish · Talaffuz qilish (mikrofon). Bitta qismda istalgancha turli mashq boʻladi.
+Jumla tuzish (soʻz plitkalari) · Harflardan soʻz · Juftini topish. Bitta qismda istalgancha turli mashq boʻladi.
 
 ## Animatsiyalar
 Qism tugaganda — konfetti, tangalar va ovozli tabrik. Daraxt oʻsganda — harakatli sahna (nihol → daraxt → meva) ovoz bilan.

@@ -137,11 +137,23 @@ function quizTests() {
   ok('match: juftlar', t.it.left.length === 3 && t.it.right.length === 3 && Q.check(t.it, R(t.it)).correct && !Q.check(t.it, { pairs: [0, 0, 0] }).correct && t.pub.k === undefined);
   ok('match: bir xil javob — notoʻgʻri test', !Q.validQ(Q.normQ({ type: 'match', pairs: [['a', 'x'], ['b', 'x']] })));
   t = mk({ type: 'speak', ar: 'بَاب', tr: 'bāb' }); ok('speak: aytdim / oʻtkazib yuborish', Q.check(t.it, { self: true }).correct && Q.check(t.it, { skip: true }).skip);
-  // jon olmaydi: oʻtkazib yuborish
+  // mikrofon mashqlari oʻchirilgan: darsga kirmaydi
   const p = G.freshProg('Z'); const LL = [{ id: 'a', order: 1, letter: 'ا', name: 'A', parts: { video: { tests: [{ type: 'speak', ar: 'أَ' }, { type: 'choice', q: 's', opts: ['x', 'y'], a: 0 }] } } }];
-  const st = G.startLesson(p, LL, 'a', 1, {}).sess; const sp = st.items.findIndex(i => i.type === 'speak');
-  for (let i = 0; i < st.items.length; i++) { const x = G.step(p, Object.assign({ sid: st.sid, i }, i === sp ? { skip: true } : R(st.items[i])), {}); if (i === sp) ok('speak oʻtkazildi: jon va dinor oʻzgarmadi', x.skip && p.hearts === 5); }
+  const st = G.startLesson(p, LL, 'a', 1, {}).sess;
+  ok('mikrofon (speak) mashqi oʻquvchiga berilmaydi', st.items.length === 1 && st.items[0].type === 'choice', st.items.map(i => i.type));
+  G.step(p, Object.assign({ sid: st.sid, i: 0 }, R(st.items[0])), {});
   ok('qism yakunlandi (1 dinor)', p.done.a === 1 && p.dinor === 1, p);
+}
+
+
+/* ---------- ovozli xabarni m4a ga oʻtkazish ---------- */
+async function audioTests() {
+  console.log('Ovoz');
+  const { toM4a } = require('./bot'); const FF = require('ffmpeg-static'); const os = require('os'), fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
+  const f = path.join(os.tmpdir(), 'na-test.ogg'); execFileSync(FF, ['-y', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-c:a', 'libopus', f]);
+  const out = await toM4a(fs.readFileSync(f), 'ogg');
+  ok('ovozli xabar (ogg/opus) → m4a (iPhone’da ham eshitiladi)', out && out.length > 1000 && out.slice(4, 8).toString() === 'ftyp', out && out.slice(0, 12));
+  ok('buzuq fayl — xatosiz, asl holicha qoladi', (await toM4a(Buffer.from([1, 2, 3]), 'ogg')) === null);
 }
 
 /* ---------- 2. bot ---------- */
@@ -383,6 +395,7 @@ async function apiTests(store) {
 (async () => {
   gameTests();
   quizTests();
+  await audioTests();
   const store = new MemoryStore(seed());
   await botTests(store);
   await apiTests(store);

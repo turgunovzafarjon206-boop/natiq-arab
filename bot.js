@@ -2,6 +2,19 @@
    ID kod faqat birinchi kiritgan Telegram akkauntga biriktiriladi; boshqa akkauntdan
    foydalanish uchun admin «boshqa qurilmaga ruxsat» (allowRebind) berishi kerak. */
 const { Bot, GrammyError, InputFile } = require('grammy');
+const { execFile } = require('child_process');
+const os = require('os'); const fsp = require('fs/promises'); const pth = require('path');
+let FF = null; try { FF = require('ffmpeg-static'); } catch (e) { }
+/* ovozli xabar (ogg/opus) iPhone’da ham eshitilishi uchun m4a (AAC) ga oʻtkaziladi */
+async function toM4a(buf, ext) {
+  if (!FF) return null; const dir = await fsp.mkdtemp(pth.join(os.tmpdir(), 'na-'));
+  const i = pth.join(dir, 'in.' + (ext || 'ogg')), o = pth.join(dir, 'out.m4a');
+  try { await fsp.writeFile(i, buf);
+    await new Promise((res, rej) => execFile(FF, ['-y', '-loglevel', 'error', '-i', i, '-vn', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', o], { timeout: 180000 }, e => e ? rej(e) : res()));
+    return await fsp.readFile(o); }
+  catch (e) { console.error('ffmpeg', e.message.split('\n')[0]); return null; }
+  finally { fsp.rm(dir, { recursive: true, force: true }).catch(() => { }); }
+}
 const G = require('./game');
 
 const CYR = { А: 'A', В: 'B', Е: 'E', К: 'K', М: 'M', Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T', Х: 'X', У: 'Y', Ж: 'J' };
@@ -104,9 +117,11 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
       const r = await doFetch(`https://api.telegram.org/file/bot${token}/${file.file_path}`); if (!r.ok) throw new Error('Telegram fayli olinmadi (HTTP ' + r.status + ')');
       const buf = Buffer.from(await r.arrayBuffer());
       let ext = (String(file.file_path || '').split('.').pop() || '').toLowerCase(); if (!/^[a-z0-9]{2,5}$/.test(ext)) ext = { video: 'mp4', audio: 'ogg', image: 'jpg' }[kind]; if (ext === 'oga') ext = 'ogg';
-      const path = `tg/${n}-${Date.now()}.${ext}`; await store.upload('arab', path, buf, mime);
+      let data = buf;
+      if (kind === 'audio' && (/^(ogg|oga|opus|webm|wav|amr)$/.test(ext) || /ogg|opus|webm/.test(mime))) { const c = await toM4a(buf, ext); if (c && c.length) { data = c; ext = 'm4a'; mime = 'audio/mp4'; } }
+      const path = `tg/${n}-${Date.now()}.${ext}`; await store.upload('arab', path, data, mime);
       const url = store.publicUrl ? store.publicUrl('arab', path) : '';
-      await store.put('ar_media', n, Object.assign(slot, { status: 'ready', url, path, mime, size: buf.length, src: m.voice ? 'voice' : kind, by: ctx.from.id, byName: tgName(ctx.from), at: now() }));
+      await store.put('ar_media', n, Object.assign(slot, { status: 'ready', url, path, mime, size: data.length, src: m.voice ? 'voice' : kind, by: ctx.from.id, byName: tgName(ctx.from), at: now() }));
       await store.put('ar_tg', ctx.from.id, Object.assign(tg, { mediaSlot: null }));
       await ctx.reply(`✅ #${n} yuklandi — «${slot.label || ''}».\nIlovada 15 soniya ichida paydo boʻladi.`, { reply_markup: ADMIN_KB });
       const left = (await store.list('ar_media', { fresh: true })).filter(x => x.status !== 'ready').length; if (left) return mediaList(ctx);
@@ -240,4 +255,4 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
 
-module.exports = { createArabBot, normCode, CODE_RE };
+module.exports = { createArabBot, normCode, CODE_RE, toM4a };
