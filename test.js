@@ -10,6 +10,23 @@ const TOKEN = '777000:ARAB_TEST_TOKEN';
 let fails = 0; const ok = (name, cond, got) => { if (cond) console.log('  ✓ ' + name); else { fails++; console.log('  ✗ ' + name + (got !== undefined ? '  got: ' + JSON.stringify(got) : '')); } };
 const Q = (q, opts, a, x = {}) => Object.assign({ q, opts, a }, x);
 
+/* toʻgʻri / notoʻgʻri javob (mashq turiga qarab) */
+function tileIdx(tiles, parts) { const used = new Set(); return parts.map(t => { const i = tiles.findIndex((x, j) => x === t && !used.has(j)); used.add(i); return i; }); }
+function R(it) {
+  switch (it.type) {
+    case 'type': return { text: it.k[0] };
+    case 'build': return { tiles: tileIdx(it.tiles, G.Q.tokens(it.k)) };
+    case 'spell': return { tiles: tileIdx(it.tiles, G.Q.graphemes(it.k)) };
+    case 'match': return { pairs: it.k };
+    case 'speak': return { self: true };
+    default: return { choice: it.k };
+  }
+}
+function W(it) {
+  switch (it.type) { case 'type': return { text: 'qqq' }; case 'build': case 'spell': return { tiles: [] }; case 'match': return { pairs: it.k.map(() => -1) }; case 'speak': return { skip: true };
+    default: return { choice: (it.k + 1) % it.opts.length }; }
+}
+
 function seed() {
   const L = (id, order, letter, name) => ({ id, order, letter, name, tr: name.toLowerCase(), parts: {
     video: { video: 'https://youtu.be/dQw4w9WgXcQ', title: name + ' harfi', tests: [Q(`«${name}» qaysi?`, [letter, 'ج', 'د'], 0), Q('2+2?', ['3', '4'], 1)] },
@@ -41,8 +58,8 @@ function gameTests() {
   ok('1-qism: video + 2 test', s && s.items.length === 3 && s.items[0].t === 'video', s && s.items.map(i => i.t));
   ok('ochiq maʼlumotda javob yoʻq', G.sessPublic(s).items.every(i => i.a === undefined));
   let x = G.step(p, { sid: s.sid, i: 0 }, C); ok('video +3', x.gain === 3, x);
-  x = G.step(p, { sid: s.sid, i: 1, choice: s.items[1].a }, C); ok('toʻgʻri javob +1', x.correct && x.gain === 4, x);
-  x = G.step(p, { sid: s.sid, i: 2, choice: (s.items[2].a + 1) % 2 }, C); ok('xato javob: jon −1', !x.correct && p.hearts === 4, x);
+  x = G.step(p, { sid: s.sid, i: 1, ...R(s.items[1]) }, C); ok('toʻgʻri javob +1', x.correct && x.gain === 4, x);
+  x = G.step(p, { sid: s.sid, i: 2, ...W(s.items[2]) }, C); ok('xato javob: jon −1', !x.correct && p.hearts === 4, x);
   ok('qism tugadi, dinor berildi', x.end && x.end.gain === 4 && p.dinor === 4, x.end);
   ok('bogʻda nihol ekildi', x.end.tree && x.end.tree.stage === 1 && x.end.tree.msg === 'Nihol ekildi', x.end.tree);
   ok('faol kun = 1', p.days === 1);
@@ -50,7 +67,7 @@ function gameTests() {
   // jon tugashi
   p.hearts = 1; r = G.startLesson(p, L, 'l1', 2, C); const s2 = r.sess; const d0 = p.dinor;
   x = G.step(p, { sid: s2.sid, i: 0 }, C);    // qoida
-  x = G.step(p, { sid: s2.sid, i: 1, choice: (s2.items[1].a + 1) % 3 }, C);
+  x = G.step(p, { sid: s2.sid, i: 1, ...W(s2.items[1]) }, C);
   ok('jon tugadi → qism toʻxtadi', x.fail && p.hearts === 0 && !p.sess, x);
   ok('dinor berilmadi', p.dinor === d0 && (p.done.l1 || 0) === 1);
   r = G.startLesson(p, L, 'l1', 2, C); ok('jonsiz dars boshlanmaydi', r.code === 'no_hearts', r);
@@ -58,12 +75,12 @@ function gameTests() {
   r = G.startReview(p, L, 'heart', C); const rv = r.sess;
   ok('takrorlash 10 savol', rv && rv.items.length === 10, rv && rv.items.length);
   ok('takrorlash savollari oʻtilgan joygacha', rv.items.every(q => /^l1:/.test(q.id)), rv.items.map(q => q.id));
-  for (let i = 0; i < 10; i++) x = G.step(p, { sid: rv.sid, i, choice: i < 7 ? rv.items[i].a : (rv.items[i].a + 1) % rv.items[i].opts.length }, C);
+  for (let i = 0; i < 10; i++) x = G.step(p, { sid: rv.sid, i, ...(i < 7 ? R(rv.items[i]) : W(rv.items[i])) }, C);
   ok('7 toʻgʻri → 3 jon', x.end && x.end.hearts === 3 && p.hearts === 3, x.end);
   ok('takrorlashda xato jonni olmaydi', p.hearts === 3);
   // butun harfni tugatish → daraxt meva soladi
   const pass = (lid, part) => { const z = G.startLesson(p, L, lid, part, C); if (z.error) return z; let y; const ss = z.sess;
-    for (let i = 0; i < ss.items.length; i++) y = G.step(p, { sid: ss.sid, i, choice: ss.items[i].a }, C); return y; };
+    for (let i = 0; i < ss.items.length; i++) y = G.step(p, { sid: ss.sid, i, ...R(ss.items[i]) }, C); return y; };
   for (let k = 2; k <= 5; k++) x = pass('l1', k);
   ok('5-qism: 3 ta meva', x.end && x.end.tree.stage === 5 && x.end.tree.fruit === 3, x.end && x.end.tree);
   ok('1 ta dars tugadi', p.lessons === 1 && p.done.l1 === 5);
@@ -72,7 +89,8 @@ function gameTests() {
   p.sess = null;
   const rp = pass('l1', 1); ok('takroriy qism — dinorsiz', rp.end && rp.end.gain === 0 && rp.end.replay, rp.end);
   ok('4-qism avtomatik yakuniy test', G.partItems(L[0], 4, C, L).length >= 5);
-  ok('5-qism lugʻat + avtomatik savollar', (() => { const it = G.partItems(L[0], 5, C, L); return it[0].t === 'words' && it.slice(1).length === 6; })());
+  { const it = G.partItems(L[0], 5, C, L); const ty = new Set(it.slice(1).map(q => q.type));
+  ok('5-qism: soʻzlar + har xil mashqlar (variant, eshitish, yozish, harf, juft)', it[0].t === 'words' && ['choice', 'listen', 'type', 'spell', 'match'].every(t => ty.has(t)), [...ty]); }
   // quriydi: keyingi 4 ta daraxt meva solsa
   for (const lid of ['l2', 'l3', 'l4']) for (let k = 1; k <= 5; k++) pass(lid, k);
   let gd = G.garden(p, C); ok('3 ta keyin hali quramagan', gd.dry === 0, gd.trees.map(t => [t.lid, t.dry]));
@@ -83,17 +101,46 @@ function gameTests() {
   ok('quragan daraxtda meva qoldi', p.trees.find(t => t.lid === 'l1').fruit === 3);
   r = G.startReview(p, L, 'water', C, { lid: 'l1' }); const wv = r.sess;
   ok('sugʻorish: 5 savol', wv && wv.items.length === 5);
-  for (let i = 0; i < 5; i++) x = G.step(p, { sid: wv.sid, i, choice: i < 2 ? wv.items[i].a : (wv.items[i].a + 1) % wv.items[i].opts.length }, C);
+  for (let i = 0; i < 5; i++) x = G.step(p, { sid: wv.sid, i, ...(i < 2 ? R(wv.items[i]) : W(wv.items[i])) }, C);
   ok('2/5 — sugʻorilmadi', x.end && !x.end.watered && G.isDry(p, p.trees[0], C), x.end);
-  r = G.startReview(p, L, 'water', C, { lid: 'l1' }); for (let i = 0; i < 5; i++) x = G.step(p, { sid: r.sess.sid, i, choice: r.sess.items[i].a }, C);
+  r = G.startReview(p, L, 'water', C, { lid: 'l1' }); for (let i = 0; i < 5; i++) x = G.step(p, { sid: r.sess.sid, i, ...R(r.sess.items[i]) }, C);
   ok('5/5 — qayta tirildi', x.end.watered && x.end.tree.revived && !G.isDry(p, p.trees[0], C), x.end);
-  r = G.startReview(p, L, 'water', C, { lid: 'l2' }); for (let i = 0; i < 5; i++) x = G.step(p, { sid: r.sess.sid, i, choice: r.sess.items[i].a }, C);
+  r = G.startReview(p, L, 'water', C, { lid: 'l2' }); for (let i = 0; i < 5; i++) x = G.step(p, { sid: r.sess.sid, i, ...R(r.sess.items[i]) }, C);
   ok('tirik daraxtni sugʻorish +1 meva', x.end.watered && x.end.tree.added === 1, x.end.tree);
   r = G.startReview(p, L, 'water', C, { lid: 'l2' }); ok('kuniga 1 marta', !!r.error, r);
   const rt = G.rating([p, { code: 'Y', name: 'Boy', dinor: 99999 }, { code: 'Z', name: 'Kam', dinor: 1 }], 'X');
   ok('reyting: dinor boʻyicha', rt.top[0].name === 'Boy' && rt.me.rank === 2 && rt.me.me, rt);
   const op = G.freshProg('Q'); G.applyOp(op, { type: 'dinor', n: 50 }, C); G.applyOp(op, { type: 'hearts', n: 2 }, C);
   ok('admin amali: dinor va jon', op.dinor === 50 && op.hearts === 2);
+}
+
+
+/* ---------- mashq turlari ---------- */
+function quizTests() {
+  console.log('Mashq turlari');
+  const Q = G.Q; const rnd = () => 0.42;
+  ok('normText: harakat, alif, urgʻu, apostrof', Q.normText('  أَبٌ ') === 'اب' && Q.normText('Bāb!') === 'bab' && Q.normText('ʻayn') === 'ayn' && Q.normText('Oʻzbek') === Q.normText("O'zbek"));
+  ok('harflarga ajratish', Q.graphemes('بَاب').length === 3 && Q.graphemes('بَاب')[0] === 'بَ');
+  const mk = (q, b) => { const n = Q.normQ(q, 'x'); const it = Q.prep(n, rnd); return { n, it, pub: G.sessPublic({ items: [it] }).items[0], r: b && Q.check(it, b) }; };
+  let t = mk({ type: 'choice', q: 'S', opts: ['a', 'b', 'c'], a: 1 }); ok('choice: kalit yashirin', t.pub.k === undefined && t.pub.a === undefined && Q.check(t.it, R(t.it)).correct && !Q.check(t.it, W(t.it)).correct);
+  t = mk({ type: 'truefalse', q: 'Bu ب', a: 0 }); ok('truefalse: Toʻgʻri/Notoʻgʻri', t.it.opts.join() === 'Toʻgʻri,Notoʻgʻri' && Q.check(t.it, { choice: 0 }).correct && !Q.check(t.it, { choice: 1 }).correct);
+  t = mk({ type: 'type', q: 'Yozing', say: 'بَاب', ans: 'eshik; darvoza' });
+  ok('type: bir nechta javob, katta-kichik harf farqsiz', Q.check(t.it, { text: ' Eshik ' }).correct && Q.check(t.it, { text: 'darvoza' }).correct && !Q.check(t.it, { text: 'uy' }).correct && t.pub.k === undefined, t.it);
+  t = mk({ type: 'type', ans: ['بَاب'] }); ok('type: arabcha harakatsiz ham qabul', Q.check(t.it, { text: 'باب' }).correct && t.it.kb === 'ar');
+  t = mk({ type: 'build', q: 'Tarjima', ar: 'هَذَا بَيْت', words: 'Bu uy', extra: 'kitob ota' });
+  ok('build: plitkalar aralash, toʻgʻri tartib', t.it.tiles.length === 4 && Q.check(t.it, R(t.it)).correct && !Q.check(t.it, { tiles: R(t.it).tiles.slice().reverse() }).correct, t.it.tiles);
+  ok('build: bir plitka ikki marta — xato', !Q.check(t.it, { tiles: [0, 0] }).correct);
+  t = mk({ type: 'spell', say: 'بَاب', words: 'بَاب', extra: 'ت ج' });
+  ok('spell: harflardan soʻz', t.it.tiles.length === 5 && Q.check(t.it, R(t.it)).correct && !Q.check(t.it, { tiles: [0, 1] }).correct, t.it.tiles);
+  t = mk({ type: 'match', pairs: [['بَاب', 'eshik'], ['بَيْت', 'uy'], ['قَلَم', 'qalam']] });
+  ok('match: juftlar', t.it.left.length === 3 && t.it.right.length === 3 && Q.check(t.it, R(t.it)).correct && !Q.check(t.it, { pairs: [0, 0, 0] }).correct && t.pub.k === undefined);
+  ok('match: bir xil javob — notoʻgʻri test', !Q.validQ(Q.normQ({ type: 'match', pairs: [['a', 'x'], ['b', 'x']] })));
+  t = mk({ type: 'speak', ar: 'بَاب', tr: 'bāb' }); ok('speak: aytdim / oʻtkazib yuborish', Q.check(t.it, { self: true }).correct && Q.check(t.it, { skip: true }).skip);
+  // jon olmaydi: oʻtkazib yuborish
+  const p = G.freshProg('Z'); const LL = [{ id: 'a', order: 1, letter: 'ا', name: 'A', parts: { video: { tests: [{ type: 'speak', ar: 'أَ' }, { type: 'choice', q: 's', opts: ['x', 'y'], a: 0 }] } } }];
+  const st = G.startLesson(p, LL, 'a', 1, {}).sess; const sp = st.items.findIndex(i => i.type === 'speak');
+  for (let i = 0; i < st.items.length; i++) { const x = G.step(p, Object.assign({ sid: st.sid, i }, i === sp ? { skip: true } : R(st.items[i])), {}); if (i === sp) ok('speak oʻtkazildi: jon va dinor oʻzgarmadi', x.skip && p.hearts === 5); }
+  ok('qism yakunlandi (1 dinor)', p.done.a === 1 && p.dinor === 1, p);
 }
 
 /* ---------- 2. bot ---------- */
@@ -249,6 +296,7 @@ async function apiTests(store) {
 
 (async () => {
   gameTests();
+  quizTests();
   const store = new MemoryStore(seed());
   await botTests(store);
   await apiTests(store);

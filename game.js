@@ -3,6 +3,7 @@
    Jon (yurak): doim 5 ta; xato javob → −1. Jon tugasa qism toʻxtaydi, dinor berilmaydi.
    Takrorlash: 10 savol, har 2 toʻgʻri javob = 1 jon. Bogʻ: har harf = 1 daraxt (5 bosqich). */
 const crypto = require('crypto');
+const Q = require('./quiz');
 
 const DEF_CFG = {
   appName: 'Natiq Arab', botBtn: 'Arab tili',
@@ -12,7 +13,7 @@ const DEF_CFG = {
   waterQ: 5, waterMin: 3, waterPerDay: 1, waterFruit: 1, // sugʻorish: 5 savol, kamida 3 toʻgʻri
   fruitStart: 3, witherAfter: 4, fruitPrice: 2,          // 5-qismda 3 meva; keyingi 4 daraxt meva solsa — quriydi
   rw: { video: 3, q: 1, card: 1 }, replayReward: false, finalMax: 15,
-  notifyChats: '', support: '',
+  notifyChats: '', support: '', treeVideo: '',
 };
 const PARTS = [
   { k: 'video', n: 'Video dars' }, { k: 'rules', n: 'Qoidalar' }, { k: 'cards', n: 'Talaffuz' },
@@ -40,31 +41,36 @@ function freshProg(code, extra) {
 }
 
 /* ---------- savollar ---------- */
-function normQ(q, id) {
-  const opts = (q.opts || []).map(String).filter(s => s.trim() !== '');
-  const a = Math.min(Math.max(+q.a || 0, 0), Math.max(opts.length - 1, 0));
-  return { id: q.id || id, q: String(q.q || ''), ru: q.ru || '', ar: q.ar || '', say: q.say || '', audio: q.audio || '', img: q.img || '', opts, a };
-}
-const validQ = q => q && q.opts && q.opts.length >= 2;
+const normQ = Q.normQ, validQ = Q.validQ;
 
-/* lugʻatdan avtomatik savollar (admin test yozmagan boʻlsa) */
+/* lugʻatdan avtomatik mashqlar (admin test yozmagan boʻlsa) — har xil turlar aralash */
 function wordQs(words, lid, pool, rnd = Math.random) {
-  const W = (words || []).filter(w => w && w.ar && w.uz); const all = (pool && pool.length ? pool : W).filter(w => w && w.ar && w.uz);
-  const out = [];
+  const W = uniq((words || []).filter(w => w && w.ar && w.uz), 'ar'); const all = uniq((pool && pool.length ? pool : W).filter(w => w && w.ar && w.uz), 'ar');
+  const out = []; const say = w => (w.audio ? '' : w.ar);
+  const oth = (w, n) => uniq(uniq(shuffle(all.filter(x => x.uz !== w.uz && x.ar !== w.ar), rnd), 'uz'), 'ar').slice(0, n);
   W.forEach((w, i) => {
-    const others = uniq(uniq(shuffle(all.filter(x => x.uz !== w.uz && x.ar !== w.ar), rnd), 'uz'), 'ar').slice(0, 3); if (!others.length) return;
-    const o1 = shuffle([w.uz, ...others.map(x => x.uz)], rnd);
-    out.push({ id: `${lid}:w:${i}:a`, q: 'Bu soʻz qanday tarjima qilinadi?', ru: 'Как переводится это слово?', ar: w.ar, say: w.audio ? '' : w.ar, audio: w.audio || '', img: '', opts: o1, a: o1.indexOf(w.uz) });
-    const o2 = shuffle([w.ar, ...others.map(x => x.ar)], rnd);
-    out.push({ id: `${lid}:w:${i}:b`, q: `«${w.uz}» arabcha qanday boʻladi?`, ru: w.ru ? `Как по-арабски «${w.ru}»?` : '', ar: '', say: '', audio: '', img: '', opts: o2, a: o2.indexOf(w.ar), arOpts: true });
+    const others = oth(w, 3); if (!others.length) return;
+    out.push(normQ({ type: 'choice', q: 'Bu soʻz qanday tarjima qilinadi?', ru: 'Как переводится это слово?', ar: w.ar, say: say(w), audio: w.audio || '', img: w.img || '', opts: [w.uz, ...others.map(x => x.uz)], a: 0 }, `${lid}:w:${i}:a`));
+    out.push(normQ({ type: 'choice', q: `«${w.uz}» arabcha qanday boʻladi?`, ru: w.ru ? `Как по-арабски «${w.ru}»?` : '', opts: [w.ar, ...others.map(x => x.ar)], a: 0, arOpts: true }, `${lid}:w:${i}:b`));
   });
-  return out;
+  if (W.length) {
+    const w = W[Math.floor(rnd() * W.length)]; const o = oth(w, 3);
+    if (o.length) out.push(normQ({ type: 'listen', q: 'Eshitganingizni tanlang', ru: 'Выберите то, что услышали', say: say(w), audio: w.audio || '', opts: [w.ar, ...o.map(x => x.ar)], a: 0, arOpts: true }, `${lid}:w:l`));
+    const t = W[(W.indexOf(w) + 1) % W.length];
+    out.push(normQ({ type: 'type', q: 'Eshitgan soʻzingiz tarjimasini yozing', ru: 'Напишите перевод услышанного слова', say: say(t), audio: t.audio || '', ans: [t.uz], kb: 'lat' }, `${lid}:w:t`));
+    const sp = W.find(x => Q.graphemes(x.ar).length >= 2 && Q.graphemes(x.ar).length <= 7);
+    if (sp) { const ex = shuffle(all.filter(x => x.ar !== sp.ar).flatMap(x => Q.graphemes(x.ar)), rnd).filter(g => !Q.graphemes(sp.ar).includes(g)).slice(0, 2);
+      out.push(normQ({ type: 'spell', q: 'Eshitgan soʻzingizni harflardan yigʻing', ru: 'Соберите услышанное слово из букв', say: say(sp), audio: sp.audio || '', words: sp.ar, extra: ex.join(' ') }, `${lid}:w:s`)); }
+    const mp = uniq([...W, ...oth(W[0], 4)], 'uz').slice(0, 4);
+    if (mp.length >= 3) out.push(normQ({ type: 'match', q: 'Juftlarini toping', ru: 'Найдите пары', pairs: mp.map(x => [x.ar, x.uz]) }, `${lid}:w:m`));
+  }
+  return out.filter(validQ);
 }
-/* talaffuz kartalaridan eshitish savollari (takrorlash uchun) */
+/* talaffuz kartalaridan eshitish mashqlari (takrorlash uchun) */
 function cardQs(cards, lid, rnd = Math.random) {
   const C = uniq((cards || []).filter(c => c && c.ar), 'ar'); if (C.length < 2) return [];
-  return C.map((c, i) => { const o = shuffle([c.ar, ...shuffle(C.filter(x => x.ar !== c.ar), rnd).slice(0, 3).map(x => x.ar)], rnd);
-    return { id: `${lid}:c:${i}`, q: 'Qaysi biri eshitildi?', ru: 'Что прозвучало?', ar: '', say: c.audio ? '' : c.ar, audio: c.audio || '', img: '', opts: o, a: o.indexOf(c.ar), arOpts: true }; });
+  return C.map((c, i) => normQ({ type: 'listen', q: 'Qaysi biri eshitildi?', ru: 'Что прозвучало?', say: c.audio ? '' : c.ar, audio: c.audio || '',
+    opts: [c.ar, ...shuffle(C.filter(x => x.ar !== c.ar), rnd).slice(0, 3).map(x => x.ar)], a: 0, arOpts: true }, `${lid}:c:${i}`));
 }
 
 /* harfning p-qismidagi savollar (admin yozgani) */
@@ -129,11 +135,8 @@ function reviewPool(prog, letters, cfg, rnd = Math.random) {
 }
 
 /* ---------- sessiya ---------- */
-function pub(it) { const x = Object.assign({}, it); delete x.a; delete x.id; return x; }
-function prepQ(q, rnd) {   // variantlarni aralashtiramiz — toʻgʻri javob indeksi faqat serverda
-  const idx = shuffle(q.opts.map((_, i) => i), rnd);
-  return Object.assign({}, q, { t: 'q', opts: idx.map(i => q.opts[i]), a: idx.indexOf(q.a) });
-}
+function pub(it) { const x = Object.assign({}, it); delete x.k; delete x.a; delete x.id; return x; }
+const prepQ = (q, rnd) => Q.prep(q, rnd);   // toʻgʻri javob (k) faqat serverda qoladi
 function sessPublic(s) {
   return { sid: s.sid, mode: s.mode, lid: s.lid, part: s.part, title: s.title, i: s.i, n: s.items.length, gain: s.gain, ok: s.ok, replay: !!s.replay, pay: !!s.pay,
     items: s.items.map(pub), tree: s.tree || null };
@@ -173,9 +176,13 @@ function step(prog, body, cfg, now = new Date()) {
   if (+body.i !== s.i) return { error: 'Sinxron emas', code: 'sync', i: s.i, hearts: prog.hearts, gain: s.gain };
   const it = s.items[s.i]; const res = { i: s.i };
   if (it.t === 'q') {
-    const c = +body.choice; const right = c === it.a; res.correct = right; res.answer = it.a; prog.answers = (prog.answers || 0) + 1;
-    if (right) { s.ok++; prog.correct = (prog.correct || 0) + 1; if (s.pay) s.gain += cfg.rw.q; }
-    else { s.bad++; if (s.mode === 'lesson') prog.hearts = Math.max(0, (prog.hearts || 0) - 1); }
+    const r = Q.check(it, body);
+    if (r.skip) res.skip = true;
+    else {
+      res.correct = !!r.correct; res.answer = r.answer; prog.answers = (prog.answers || 0) + 1;
+      if (r.correct) { s.ok++; prog.correct = (prog.correct || 0) + 1; if (s.pay) s.gain += cfg.rw.q; }
+      else { s.bad++; if (s.mode === 'lesson') prog.hearts = Math.max(0, (prog.hearts || 0) - 1); }
+    }
   } else if (it.t === 'video') { if (s.pay) s.gain += cfg.rw.video; }
   else if (it.t === 'card') { if (s.pay) s.gain += cfg.rw.card; }
   s.i++; res.hearts = prog.hearts; res.gain = s.gain;
@@ -264,5 +271,5 @@ function applyOp(prog, op, cfg) {
   return true;
 }
 
-module.exports = { DEF_CFG, PARTS, STAGES, cfgOf, tzDate, shuffle, sorted, freshProg, normQ, wordQs, cardQs, partItems, partTests, hasContent, unlocked, current,
+module.exports = { Q, DEF_CFG, PARTS, STAGES, cfgOf, tzDate, shuffle, sorted, freshProg, normQ, wordQs, cardQs, partItems, partTests, hasContent, unlocked, current,
   markDay, reviewPool, startLesson, startReview, step, finish, grow, isDry, waterState, water, garden, sell, rating, applyOp, sessPublic, uid: sid };

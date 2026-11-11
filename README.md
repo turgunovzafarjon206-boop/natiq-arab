@@ -11,6 +11,7 @@ boshqaruv esa natiq.uz → **Mini ilova** boʻlimida.
 | `bot.js` | /start → telefon → 6 xonali ID → «Arab tili» tugmasi; ommaviy xabarlar |
 | `api.js` | Mini App API (Telegram initData tekshiruvi, javoblar faqat serverda tekshiriladi) |
 | `game.js` | Oʻyin qoidalari: jon, dinor, takrorlash, bogʻ, reyting |
+| `quiz.js` | 9 xil mashq turi va javobni serverda tekshirish |
 | `store.js` | Supabase bilan ishlash |
 | `app.html` | Mini App (oʻquvchi koʻradigan ilova) |
 | `test.js` | Sinovlar: `npm test` |
@@ -35,3 +36,11 @@ Tekshirish: `https://<domen>/health` → `{"ok":true,…}`. natiq.uz → Mini il
 - Takrorlash: 10 savol, har 2 toʻgʻri javob — 1 jon (savollar oʻtilgan joygacha, har safar aralash).
 - Bogʻ: 1-qism — nihol, 2 — unib chiqadi, 3 — nihol, 4 — daraxt, 5 — 3 ta meva. Keyingi 4 ta daraxt meva solsa — eski daraxt quriydi; 5 savollik takrorlash bilan sugʻoriladi. Mevalar admin belgilagan narxda sotiladi.
 - Tugatilgan qismni qayta oʻtganda dinor berilmaydi (sozlamada yoqish mumkin).
+
+## Mashq turlari (saytda «Darslar → Tahrirlash → Mashq qoʻshish»)
+Variant tanlash · Eshitib tanlash · Rasmni tanlash · Toʻgʻri/notoʻgʻri · Javobni yozish (lotin yoki ekrandagi arabcha klaviatura) ·
+Jumla tuzish (soʻz plitkalari) · Harflardan soʻz · Juftini topish · Talaffuz qilish (mikrofon). Bitta qismda istalgancha turli mashq boʻladi.
+
+## Animatsiyalar
+Qism tugaganda — konfetti, tangalar va ovozli tabrik. Daraxt oʻsganda — harakatli sahna (nihol → daraxt → meva) ovoz bilan.
+Saytda «Sozlamalar»ga oʻz videongizni (MP4) yuklasangiz, daraxt meva solganda shu video koʻrsatiladi.
