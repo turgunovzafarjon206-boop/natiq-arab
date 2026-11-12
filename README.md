@@ -35,7 +35,7 @@ boshqaruv esa natiq.uz → **Mini ilova** boʻlimida.
 Tekshirish: `https://<domen>/health` → `{"ok":true,…}`. natiq.uz → Mini ilova → «● Bot ishlayapti».
 
 ## Qoidalar (Sozlamalar’da oʻzgartiriladi)
-- Har harf = 5 qism: video (3 dinor) · qoidalar · talaffuz kartalari (har biri 1) · yakuniy test · lugʻat. Har toʻgʻri javob — 1 dinor.
+- Har harf = 5 qism: video (3 dinor) · qoidalar · talaffuz kartalari (har biri 1, koʻpi bilan 25 ta) · yakuniy test · lugʻat. Har toʻgʻri javob — 1 dinor.
 - 5 ta jon. Xato — −1 jon. Jon tugasa qism toʻxtaydi, dinor berilmaydi.
 - Takrorlash: 10 savol, har 2 toʻgʻri javob — 1 jon (savollar oʻtilgan joygacha, har safar aralash).
 - Bogʻ: 1-qism — nihol, 2 — unib chiqadi, 3 — nihol, 4 — daraxt, 5 — 3 ta meva. Keyingi 4 ta daraxt meva solsa — eski daraxt quriydi; 5 savollik takrorlash bilan sugʻoriladi. Mevalar admin belgilagan narxda sotiladi.

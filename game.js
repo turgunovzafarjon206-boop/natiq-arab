@@ -23,6 +23,7 @@ const PARTS = [
   { k: 'video', n: 'Video dars' }, { k: 'rules', n: 'Qoidalar' }, { k: 'cards', n: 'Talaffuz' },
   { k: 'final', n: 'Yakuniy test' }, { k: 'vocab', n: 'Lugʻat' },
 ];
+const CARD_MAX = 25;   // talaffuz qismida koʻpi bilan 25 ta soʻz
 const STAGES = ['', 'Nihol ekildi', 'Unib chiqdi', 'Nihol boʻldi', 'Daraxt boʻldi', 'Meva soldi'];
 
 const sid = () => Date.now().toString(36) + crypto.randomBytes(5).toString('hex');
@@ -87,7 +88,7 @@ function partItems(L, p, cfg, letters, rnd = Math.random) {
   const P = (L.parts || {})[PARTS[p - 1].k] || {}; const items = [];
   if (p === 1) { if (P.video) items.push({ t: 'video', url: P.video, title: P.title || '', desc: P.desc || '' }); items.push(...partTests(L, 1)); }
   if (p === 2) { if (P.text) items.push({ t: 'rule', title: P.title || '', text: P.text, ru: P.ru || '', img: P.img || '' }); items.push(...partTests(L, 2)); }
-  if (p === 3) (P.cards || []).filter(c => c && c.ar).forEach(c => items.push({ t: 'card', ar: c.ar, tr: c.tr || '', uz: c.uz || '', ru: c.ru || '', audio: c.audio || '', img: c.img || '' }));
+  if (p === 3) (P.cards || []).filter(c => c && c.ar).slice(0, CARD_MAX).forEach(c => items.push({ t: 'card', ar: c.ar, tr: c.tr || '', uz: c.uz || '', ru: c.ru || '', audio: c.audio || '', img: c.img || '' }));
   if (p === 4) {
     let qs = partTests(L, 4);
     if (!qs.length) { const V = (L.parts || {}).vocab || {};
@@ -130,7 +131,7 @@ function reviewPool(prog, letters, cfg, rnd = Math.random) {
     const d = (prog.done || {})[L.id] || 0; const upto = Math.min(5, d + 1);
     for (let p = 1; p <= upto; p++) {
       const T = partTests(L, p); pool.push(...T);
-      if (p === 3) pool.push(...cardQs(((L.parts || {}).cards || {}).cards, L.id, rnd));
+      if (p === 3) pool.push(...cardQs((((L.parts || {}).cards || {}).cards || []).filter(c => c && c.ar).slice(0, CARD_MAX), L.id, rnd));
       if (p === 5 && !T.length) pool.push(...wordQs(((L.parts || {}).vocab || {}).words, L.id, W, rnd));
     }
     if (d < 5) break;
@@ -275,5 +276,5 @@ function applyOp(prog, op, cfg) {
   return true;
 }
 
-module.exports = { Q, MASCOTS, DEF_CFG, PARTS, STAGES, cfgOf, tzDate, shuffle, sorted, freshProg, normQ, wordQs, cardQs, partItems, partTests, hasContent, unlocked, current,
+module.exports = { Q, CARD_MAX, MASCOTS, DEF_CFG, PARTS, STAGES, cfgOf, tzDate, shuffle, sorted, freshProg, normQ, wordQs, cardQs, partItems, partTests, hasContent, unlocked, current,
   markDay, reviewPool, startLesson, startReview, step, finish, grow, isDry, waterState, water, garden, sell, rating, applyOp, sessPublic, uid: sid };

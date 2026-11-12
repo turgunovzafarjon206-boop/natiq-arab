@@ -52,6 +52,8 @@ function gameTests() {
   const S = seed(); const L = S.ar_letters; const C = G.cfgOf(S.ar_cfg[0]); const p = G.freshProg('X');
   ok('ID normallash (kirill, boʻsh joy)', normCode(' а7к-3р9 ') === 'A7K3P9', normCode(' а7к-3р9 '));
   ok('1-harf 1-qism ochiq', G.unlocked(p, L, 'l1', 1));
+  { const big = JSON.parse(JSON.stringify(L[0])); big.parts.cards.cards = Array.from({ length: 40 }, (_, i) => ({ ar: 'بَ' + i, tr: 'b' + i }));
+    ok('talaffuz: koʻpi bilan 25 ta karta', G.partItems(big, 3, C, L).length === 25 && G.CARD_MAX === 25); }
   ok('1-harf 2-qism yopiq', !G.unlocked(p, L, 'l1', 2));
   ok('2-harf yopiq', !G.unlocked(p, L, 'l2', 1));
   let r = G.startLesson(p, L, 'l1', 2, C); ok('yopiq qism boshlanmaydi', !!r.error);
