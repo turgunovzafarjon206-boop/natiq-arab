@@ -38,6 +38,14 @@ function createApi({ store, token, onOrder = async () => {}, clock = () => new D
   async function letters() { const raw = await store.list('ar_letters', { ttl: 30000 }); const M = await mediaMap();
     if (letC && letC.raw === raw && letC.m === M) return letC.v; const v = resolveTg(raw, M).map(l => { const P = l.parts || {};   // rasmli variant «tg:5 = olma» → yuklanmagan boʻlsa olib tashlanadi
       ['video', 'rules', 'final', 'vocab'].forEach(k => (P[k] && P[k].tests || []).forEach(q => { if (q && q.type === 'image' && Array.isArray(q.opts)) q.opts = q.opts.map(o => /^\s*=/.test(o) ? '' : o); })); return l; });
+    /* bir marta yozilgan ovoz hamma joyda: karta/lugʻatdagi soʻz audiosi shu matnli testlarga ham qoʻyiladi;
+       bir necha soʻzli matn (jumla tuzish) — soʻzlar audiosi ketma-ket («|» bilan) */
+    const AM = new Map();
+    v.forEach(l => { const P = l.parts || {}; [...((P.cards || {}).cards || []), ...((P.vocab || {}).words || [])].forEach(c => { if (c && c.ar && c.audio && !AM.has(c.ar)) AM.set(c.ar, c.audio); }); });
+    const fill = t => { t = String(t || '').trim(); if (!t) return ''; if (AM.has(t)) return AM.get(t); const ws = t.split(/\s+/); return ws.length > 1 && ws.every(w => AM.has(w)) ? ws.map(w => AM.get(w)).join('|') : ''; };
+    v.forEach(l => { const P = l.parts || {};
+      ['video', 'rules', 'final', 'vocab'].forEach(k => (P[k] && P[k].tests || []).forEach(q => { if (q && !q.audio) { const a = fill(q.say); if (a) q.audio = a; } }));
+      [...((P.cards || {}).cards || []), ...((P.vocab || {}).words || [])].forEach(c => { if (c && !c.audio) { const a = fill(c.ar); if (a) c.audio = a; } }); });
     letC = { raw, m: M, v }; return v; }
 
   /* tezlik: tekshirilgan foydalanuvchi va oʻquvchi holati xotirada; bazaga yozish fonda (navbat bilan) */

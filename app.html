@@ -610,7 +610,9 @@ let AUD=null;const SAYS=[];
 const sayBtn=(text,url,cls,slow)=>{SAYS.push([text,url]);return `<button class="spk ${cls||''}" onclick="sayI(${SAYS.length-1},${slow?1:0})" aria-label="${T('Tinglang')}">${slow?IC.turtle:IC.vol}</button>`;};
 function sayI(i,slow){const s=SAYS[i];if(s)speak(s[0],s[1],slow);}
 function speak(text,url,slow){try{if(AUD){AUD.pause();AUD=null;}if(window.speechSynthesis)speechSynthesis.cancel();}catch(e){}
+ if(url&&url.indexOf('|')>0){playSeq(url.split('|'),slow,text);return;}
  if(url){AUD=new Audio(url);AUD.playbackRate=slow?.7:1;AUD.play().catch(()=>sayTTS(text,slow));return;}sayTTS(text,slow);}
+function playSeq(urls,slow,text){let i=0;const next=()=>{if(i>=urls.length)return;const a=new Audio(urls[i++]);AUD=a;a.playbackRate=slow?.7:1;a.onended=()=>{if(AUD===a)setTimeout(next,slow?260:140);};a.play().catch(()=>{AUD=null;sayTTS(text,slow);});};next();}
 function sayTTS(text,slow){if(!text||!window.speechSynthesis){toast('🔇 '+T('Tinglang'));return;}
  const u=new SpeechSynthesisUtterance(text);u.lang='ar-SA';u.rate=slow?.45:.8;const v=speechSynthesis.getVoices().find(v=>/^ar/i.test(v.lang));if(v)u.voice=v;speechSynthesis.speak(u);}
 try{window.speechSynthesis&&speechSynthesis.getVoices();}catch(e){}

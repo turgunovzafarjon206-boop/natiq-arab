@@ -381,6 +381,17 @@ async function apiTests(store) {
     const rr = await call('lesson', { lid: 'l1', part: 3 }, IDT); const cs = rr.body.sess && rr.body.sess.items;
     ok('bot orqali yuklangan audio darsda ishlaydi', cs && /^https:\/\/example\.test\/public\/arab\/tg\/7-/.test(cs[0].audio) && cs[1].audio === '', cs && cs.map(x => x.audio));
   }
+  // kartaga yozilgan ovoz shu matnli testlarda ham ishlaydi; bir necha soʻzli matn — soʻzlar audiosi ketma-ket
+  {
+    const L = await store.get('ar_letters', 'l1'); const c = L.parts.cards.cards; c[0].audio = 'https://x.test/a.m4a'; c[1].audio = 'https://x.test/i.m4a';
+    L.parts.rules.tests = [{ id: 'au1', type: 'listen', q: 'Eshiting', say: c[0].ar, opts: ['A', 'B'], a: 0 }, { id: 'au2', type: 'build', q: 'Tuzing', say: c[0].ar + ' ' + c[1].ar, words: c[0].ar + ' ' + c[1].ar },
+      { id: 'au3', type: 'listen', q: 'Eshiting', say: 'نُونْ', opts: ['A', 'B'], a: 0 }];
+    await store.put('ar_letters', 'l1', L); await new Promise(r => setTimeout(r, 10));
+    const rr = await call('lesson', { lid: 'l1', part: 2 }, IDT); const it = (rr.body.sess && rr.body.sess.items || []).filter(x => x.t === 'q'); const sy = { au1: L.parts.rules.tests[0].say, au2: L.parts.rules.tests[1].say, au3: 'نُونْ' }; const by = id => it.find(x => x.say === sy[id]) || {};
+    ok('test kartadagi audiodan foydalanadi', by('au1').audio === 'https://x.test/a.m4a', it.map(x => [x.id, x.audio]));
+    ok('jumla — soʻzlar audiosi ketma-ket', by('au2').audio === 'https://x.test/a.m4a|https://x.test/i.m4a', by('au2'));
+    ok('audiosi yoʻq matn — boʻsh (TTS)', by('au3').audio === '', by('au3'));
+  }
   await store.patch('ar_codes', 'A7K3P9', { status: 'blocked' });
   r = await call('me', {}, ID1); ok('bloklangan → 403', r.status === 403 && r.body.code === 'blocked');
   await store.patch('ar_codes', 'A7K3P9', { status: 'active' });
