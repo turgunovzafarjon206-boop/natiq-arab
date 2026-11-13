@@ -140,7 +140,7 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
   });
   bot.command(['app', 'menu'], async ctx => { if (ctx.chat.type !== 'private') return; const { c } = await linked(ctx.from.id);
     if (c && c.status === 'active') return welcome(ctx, c); return ctx.reply('Avval /start bosing va ID kodingizni kiriting.'); });
-  bot.command('myid', ctx => ctx.reply(`Chat ID: <code>${ctx.chat.id}</code>\n(buyurtma xabarlari uchun saytdagi «Mini ilova → Sozlamalar»ga yozing)`, { parse_mode: 'HTML' }));
+  bot.command('myid', ctx => ctx.reply(`Telegram ID: <code>${ctx.from.id}</code>${ctx.chat.id !== ctx.from.id ? `\nChat ID: <code>${ctx.chat.id}</code>` : ''}\n(ID’ni administratorga yuboring: boshqa akkauntdan kirish yoki xabarlar uchun)`, { parse_mode: 'HTML' }));
   bot.command('help', ctx => ctx.reply('«Natiq Arab» — arab tilini oʻyin orqali oʻrganish ilovasi.\n/start — boshlash\n/app — ilovani ochish tugmasi'));
 
   bot.on('message:contact', async ctx => {
@@ -175,7 +175,8 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     const c = await store.get('ar_codes', code);
     if (!c) return fail('❌ Bunday ID topilmadi. Kodni tekshirib, qaytadan yozing.');
     if (c.status === 'blocked') return fail('⛔ Bu ID bloklangan. Administrator bilan bogʻlaning.');
-    if (c.tgId && String(c.tgId) !== String(id) && !c.allowRebind) {
+    const okNew = c.allowRebind || (c.allowTgId && String(c.allowTgId) === String(id));   // admin kiritgan yangi Telegram ID
+    if (c.tgId && String(c.tgId) !== String(id) && !okNew) {
       const tries = [...(c.tries || []), { tgId: id, name: tgName(ctx.from), username: ctx.from.username || '', phone: tg.phone, at: now() }].slice(-5);
       await store.put('ar_codes', c.id, Object.assign(c, { tries }));
       return fail('🔒 Bu ID boshqa Telegram akkauntga biriktirilgan.\nBoshqa qurilma yoki akkauntdan foydalanish uchun administrator ruxsat berishi kerak.');
@@ -184,7 +185,7 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     const hist = prev ? [...(c.history || []), { tgId: prev, name: c.tgName || '', phone: c.tgPhone || '', until: now() }].slice(-10) : (c.history || []);
     const phoneOk = c.phone ? digits(c.phone).slice(-9) === digits(tg.phone).slice(-9) : null;
     await store.put('ar_codes', c.id, Object.assign(c, { tgId: id, tgName: tgName(ctx.from), tgUsername: ctx.from.username || '', tgPhone: tg.phone, phoneOk,
-      status: 'active', activatedAt: c.activatedAt || now(), lastBindAt: now(), allowRebind: false, history: hist }));
+      status: 'active', activatedAt: c.activatedAt || now(), lastBindAt: now(), allowRebind: false, allowTgId: null, history: hist }));
     if (prev) { const old = await store.get('ar_tg', prev); if (old && old.code === c.id) await store.put('ar_tg', prev, Object.assign(old, { code: null, step: 'code' })); await resetMenu(prev); }
     await store.put('ar_tg', id, Object.assign(tg, { code: c.id, step: 'done', fails: [], at: now() }));
     await ctx.reply('🎉 ID qabul qilindi! Hisobingiz faollashtirildi.');
@@ -196,6 +197,18 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     const C = await getCfg(); const chats = String(C.notifyChats || '').split(/[\s,;]+/).filter(Boolean);
     const t = `🛒 <b>Yangi buyurtma</b>\n${esc(o.productName)} — ${o.price} dinor\n👤 ${esc(o.name)} (ID ${o.code})\n📞 ${esc(o.phone)}${o.username ? '\n@' + esc(o.username) : ''}`;
     for (const ch of chats) { try { await bot.api.sendMessage(ch, t, { parse_mode: 'HTML' }); } catch (e) { console.error('notify', ch, e.message); } }
+  }
+
+  /* yangi toʻlov (dinor sotib olish) — operatorlarga chek rasmi bilan */
+  async function notifyPay(x) {
+    const C = await getCfg(); const chats = String(C.notifyChats || '').split(/[\s,;]+/).filter(Boolean);
+    const t = `💳 <b>Dinor sotib olish</b>\n${x.dinor} dinor — ${String(Math.round(+x.sum || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} soʻm\n👤 ${esc(x.name)} (ID ${x.code})${x.username ? ' @' + esc(x.username) : ''}\nnatiq.uz → Mini ilova → «Toʻlovlar» boʻlimida tasdiqlang.`;
+    for (const ch of chats) { try { if (x.img && /^https:/.test(x.img)) await bot.api.sendPhoto(ch, x.img, { caption: t, parse_mode: 'HTML' }); else await bot.api.sendMessage(ch, t, { parse_mode: 'HTML' }); } catch (e) { console.error('notify pay', ch, e.message); } }
+  }
+  /* bitta oʻquvchiga bot xabari (toʻlov tasdiqlandi va h.k.) */
+  async function notifyCode(code, text) {
+    const c = await store.get('ar_codes', code); if (!c || !c.tgId) return false; const C = await getCfg();
+    await bot.api.sendMessage(c.tgId, String(text || ''), appUrl ? { reply_markup: appBtn(C, false) } : {}); return true;
   }
 
   /* ommaviy xabarlar (saytdan: ar_msgs, status = pending) */
@@ -251,7 +264,7 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
   }
 
   bot.catch(err => console.error('bot xatosi:', err.error && err.error.message || err.message));
-  return { bot, welcome, notifyOrder, processMsgs, processReminders, normCode, setMenu };
+  return { bot, welcome, notifyOrder, notifyPay, notifyCode, processMsgs, processReminders, normCode, setMenu };
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
 

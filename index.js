@@ -51,7 +51,8 @@ function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), 
       if (req.method === 'GET' && (p === '/app' || p === '/')) return send(200, appHtml(), 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache' });
       if (req.method === 'POST' && p.startsWith('/api/')) {
         let body = ''; let big = false;
-        for await (const ch of req) { body += ch; if (body.length > 65536) { big = true; break; } }
+        const lim = p === '/api/pay' ? 5 * 1048576 : 65536;   // chek rasmi uchun kattaroq
+        for await (const ch of req) { body += ch; if (body.length > lim) { big = true; break; } }
         if (big) return send(413, JSON.stringify({ error: 'Soʻrov juda katta' }));
         let j = {}; try { j = JSON.parse(body || '{}'); } catch (e) { return send(400, JSON.stringify({ error: 'JSON xato' })); }
         const r = await api.handle(p.slice(5), j); return send(r.status, JSON.stringify(r.body), undefined, { 'Cache-Control': 'no-store' });
@@ -72,7 +73,7 @@ async function main() {
   if (!appUrl) console.warn('⚠️ APP_URL yoʻq: Railway → Settings → Networking → Generate Domain bosing');
 
   let A;
-  const api = createApi({ store, token, onOrder: o => A && A.notifyOrder(o) });
+  const api = createApi({ store, token, onOrder: o => A && A.notifyOrder(o), onPay: x => A && A.notifyPay(x), onNotify: (code, t) => A && A.notifyCode(code, t) });
   const big = createBig({ apiId: env.TG_API_ID, apiHash: env.TG_API_HASH, token });
   if (big) big.connect().then(() => console.log('MTProto ulandi — katta fayllar yuklanadi')).catch(e => console.error('MTProto:', e.message));
   A = createArabBot({ token, store, appUrl, big, cfg: () => api.cfg(), asset: assetPath, adminIds: String(env.ADMIN_IDS || '').split(/[\s,;]+/).filter(Boolean) });

@@ -162,7 +162,7 @@ async function audioTests() {
 async function botTests(store) {
   console.log('Telegram bot');
   const calls = [];
-  const { bot, processMsgs, notifyOrder } = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app',
+  const { bot, processMsgs, notifyOrder, notifyCode, notifyPay } = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app',
     botOpts: { botInfo: { id: 7, is_bot: true, first_name: 'Natiq Arab', username: 'natiq_arab_bot', can_join_groups: false, can_read_all_group_messages: false, supports_inline_queries: false } } });
   let styleFail = false;
   bot.api.config.use(async (prev, method, payload) => {
@@ -212,7 +212,15 @@ async function botTests(store) {
   ok('eski akkaunt uzildi', (await store.get('ar_tg', 111)).code === null);
   ok('eski akkaunt menyusi tiklandi', sent('setChatMenuButton').some(c => c.payload.chat_id === 111 && c.payload.menu_button.type === 'default'));
   // yana qaytarib beramiz (API sinovlari uchun)
-  await store.patch('ar_codes', 'A7K3P9', { allowRebind: true }); await bot.handleUpdate(txt(U1, 'A7K3P9'));
+  await store.patch('ar_codes', 'A7K3P9', { allowTgId: 999 }); await bot.handleUpdate(txt(U1, 'A7K3P9'));
+  ok('admin kiritgan Telegram ID’dan boshqasi kira olmaydi', (await store.get('ar_codes', 'A7K3P9')).tgId === 222);
+  await store.patch('ar_codes', 'A7K3P9', { allowTgId: '111' }); await bot.handleUpdate(txt(U1, 'A7K3P9'));
+  { const cc = await store.get('ar_codes', 'A7K3P9'); ok('admin kiritgan Telegram ID bilan yangi akkauntga oʻtdi', cc.tgId === 111 && !cc.allowTgId, cc); }
+  { const n = calls.length; await notifyCode('A7K3P9', '✅ 200 dinor sotib oldingiz'); const m = calls.slice(n).find(c => c.method === 'sendMessage');
+    ok('bitta oʻquvchiga bot xabari (ilova tugmasi bilan)', m && m.payload.chat_id === 111 && /200 dinor/.test(m.payload.text) && m.payload.reply_markup.inline_keyboard[0][0].web_app, m); }
+  { await store.put('ar_cfg', 'main', Object.assign(await store.get('ar_cfg', 'main'), { notifyChats: '-100500' })); const n = calls.length;
+    await notifyPay({ code: 'A7K3P9', name: 'Aziza', dinor: 200, sum: 20000, img: 'https://x.test/c.jpg' }); const m = calls.slice(n).find(c => c.method === 'sendPhoto');
+    ok('yangi toʻlov — operatorga chek rasmi', m && m.payload.chat_id === '-100500' && /200 dinor — 20 000 soʻm/.test(m.payload.caption), m); }
   ok('qaytadan U1 ga', (await store.get('ar_codes', 'A7K3P9')).tgId === 111);
   // koʻp urinish
   await bot.handleUpdate(txt(U3, '/start')); await bot.handleUpdate(msg(U3, { contact: { phone_number: '+998977777777', user_id: 333 } }));
@@ -405,6 +413,77 @@ async function apiTests(store) {
   srv.close();
 }
 
+/* ---------- kurslar, obuna, dinor sotib olish ---------- */
+async function courseSocialPayTests() {
+  console.log('Kurslar, obuna, dinor sotib olish');
+  const S = seed(); const L = (id, course, ord) => Object.assign(JSON.parse(JSON.stringify(S.ar_letters[0])), { id, order: ord, course, name: id });
+  const store = new MemoryStore({
+    ar_cfg: [{ id: 'main', dinorPlans: [{ dinor: 200, sum: 20000 }, { dinor: 0, sum: 5 }], payCard: '8600 1234 5678 9012', payName: 'Natiq Academy' }],
+    ar_courses: [{ id: 'pro', name: 'Pro', paid: true, order: 2 }, { id: 'nav', name: 'Keyingi', paid: false, order: 3 }, { id: 'yash', name: 'Yashirin', hidden: true, order: 4 }],
+    ar_letters: [L('h1', undefined, 1), L('h2', 'harflar', 2), L('p1', 'pro', 1), L('n1', 'nav', 1), L('y1', 'yash', 1), L('x1', 'oʻchgan', 9)],
+    ar_codes: [{ id: 'UAAAA1', name: 'Bir', status: 'active', tgId: 501 }, { id: 'UBBBB2', name: 'Ikki', status: 'active', tgId: 502, courses: ['harflar'], noVideo: true },
+      { id: 'UCCCC3', name: 'Uch', status: 'active', tgId: 503, courses: ['harflar', 'pro'] }, { id: 'UDDDD4', name: 'Yashirin', status: 'active', tgId: 504, hideRank: true }],
+    ar_tg: [{ id: '501', code: 'UAAAA1' }, { id: '502', code: 'UBBBB2' }, { id: '503', code: 'UCCCC3' }, { id: '504', code: 'UDDDD4' }],
+  });
+  const pays = [], notes = [];
+  const api = createApi({ store, token: TOKEN, onPay: async x => pays.push(x), onNotify: async (c, t) => notes.push([c, t]) });
+  const I = id => signInitData({ id, first_name: 'U' + id }, TOKEN);
+  const call = (n, b, id) => api.handle(n, Object.assign({ initData: I(id) }, b || {}));
+  // kurslar
+  let r = await call('me', {}, 501); const cs = Object.fromEntries(r.body.courses.map(c => [c.id, c]));
+  ok('kurslar: Harflar ochiq, pullik — yopiq, bepul — navbatda', cs.harflar.open && cs.pro.lock === 'paid' && cs.nav.lock === 'turn' && !cs.yash, r.body.courses);
+  ok('kurssiz va oʻchgan kursdagi dars — Harflar kursida, yashirin kurs darsi koʻrinmaydi', r.body.path.filter(x => x.course === 'harflar').map(x => x.id).join() === 'h1,h2,x1' && !r.body.path.some(x => x.id === 'y1'), r.body.path.map(x => [x.id, x.course]));
+  ok('yopiq kurs darslari yopiq', r.body.path.find(x => x.id === 'p1').parts.every(p => !p.open) && r.body.cur.lid === 'h1');
+  r = await call('lesson', { lid: 'p1', part: 1 }, 501); ok('ruxsatsiz pullik kurs — 400', r.status === 400, r.body);
+  r = await call('me', {}, 503); ok('ID’da ruxsat — pullik kurs ochiq', r.body.courses.find(c => c.id === 'pro').open && r.body.path.find(x => x.id === 'p1').parts[0].open, r.body.courses);
+  r = await call('lesson', { lid: 'p1', part: 1 }, 503); ok('pullik kurs darsi boshlanadi', r.status === 200, r.body);
+  await call('quit', {}, 503);
+  r = await call('me', {}, 502); ok('roʻyxatda yoʻq bepul kurs — yopiq', r.body.courses.find(c => c.id === 'nav').lock === 'denied' && r.body.user.noVideo === true, r.body.courses);
+  // bepul kurs navbat kelganda ochiladi
+  { const C2 = G.courseList([{ id: 'nav', name: 'K', order: 3 }]); const Ls = [{ id: 'a', order: 1 }, { id: 'b', order: 1, course: 'nav' }];
+    ok('bepul kurs — Harflar tugagach ochiladi', !G.courseStates({ done: { a: 4 } }, {}, C2, Ls)[1].open && G.courseStates({ done: { a: 5 } }, {}, C2, Ls)[1].open); }
+  // video yopiq
+  r = await call('lesson', { lid: 'h1', part: 1 }, 502); const it = r.body.sess.items;
+  ok('video yopiq ID: video oʻrniga izoh, mashqlar bor', it[0].t === 'rule' && /Video darslar/.test(it[0].text) && !it.some(x => x.t === 'video') && it.some(x => x.t === 'q'), it.map(x => x.t));
+  await call('quit', {}, 502);
+  r = await call('lesson', { lid: 'h1', part: 1 }, 501); ok('oddiy ID — video bor', r.body.sess.items[0].t === 'video'); await call('quit', {}, 501);
+  // obuna
+  await call('me', {}, 502); await call('me', {}, 503); await call('me', {}, 504);
+  r = await call('rating', {}, 501); const pidB = (r.body.top.find(x => x.name === 'Ikki') || {}).pid;
+  ok('reytingda pid (ID kod koʻrinmaydi), yashirin yoʻq', pidB && pidB.length === 12 && !JSON.stringify(r.body).includes('UBBBB2') && !r.body.top.some(x => x.name === 'Yashirin'), r.body);
+  r = await call('rating', { q: 'uch' }, 501); ok('reytingda qidiruv', r.body.top.length === 1 && r.body.top[0].name === 'Uch', r.body.top);
+  r = await call('profile', { pid: pidB }, 501); ok('boshqa profil: dinor, dars, meva, obunachilar', r.status === 200 && r.body.name === 'Ikki' && r.body.followers === 0 && !r.body.iFollow && 'fruit' in r.body && Array.isArray(r.body.items), r.body);
+  r = await call('follow', { pid: pidB, on: true }, 501); ok('obuna boʻlish', r.status === 200 && r.body.iFollow && r.body.followers === 1, r.body);
+  await call('follow', { pid: pidB, on: true }, 503);
+  r = await call('profile', { pid: pidB }, 501); ok('profilda obunachilar soni', r.body.followers === 2 && r.body.iFollow, r.body);
+  r = await call('follows', { pid: pidB, kind: 'followers' }, 501); ok('obunachilar roʻyxati', r.body.items.map(x => x.name).sort().join() === 'Bir,Uch', r.body);
+  r = await call('follows', { pid: pidB, kind: 'followers', q: 'bir' }, 501); ok('obunachilar ichida qidiruv', r.body.items.length === 1 && r.body.items[0].me, r.body);
+  r = await call('follows', { kind: 'following' }, 501); ok('mening obunalarim', r.body.items.length === 1 && r.body.items[0].name === 'Ikki' && r.body.items[0].iFollow, r.body);
+  r = await call('profile', { me: true }, 501); ok('oʻz profilim: obunalar soni', r.body.me && r.body.following === 1, r.body);
+  r = await call('follow', { pid: pidB, on: false }, 501); ok('obunani bekor qilish', !r.body.iFollow && r.body.followers === 1, r.body);
+  r = await call('follow', { pid: (await call('profile', { me: true }, 501)).body.pid, on: true }, 501); ok('oʻziga obuna — 400', r.status === 400);
+  r = await call('profile', { pid: 'yolgon' }, 501); ok('notanish profil — 404', r.status === 404);
+  await store.put('ar_orders', 'o1', { code: 'UBBBB2', productName: 'Kitob', price: 10, status: 'delivered', at: '2026-01-01' }); await store.put('ar_orders', 'o2', { code: 'UBBBB2', productName: 'Qaytgan', status: 'refunded', at: '2026-01-02' });
+  r = await call('profile', { pid: pidB }, 501); ok('sotib olgan buyumlari (qaytarilgani yoʻq)', r.body.items.length === 1 && r.body.items[0].name === 'Kitob', r.body.items);
+  // dinor sotib olish
+  r = await call('plans', {}, 501); ok('tariflar va karta', r.body.plans.length === 1 && r.body.plans[0].dinor === 200 && r.body.card === '8600 1234 5678 9012', r.body);
+  const img = 'data:image/jpeg;base64,' + Buffer.alloc(4000, 7).toString('base64');
+  r = await call('pay', { plan: 5, img }, 501); ok('notoʻgʻri tarif — 400', r.status === 400);
+  r = await call('pay', { plan: 0, img: 'data:text/html;base64,AAAA' }, 501); ok('rasm boʻlmasa — 400', r.status === 400);
+  r = await call('pay', { plan: 0, img }, 501);
+  const py = (await store.list('ar_pays'))[0];
+  ok('chek yuklandi, admin kutmoqda', r.status === 200 && py && py.status === 'new' && py.dinor === 200 && py.sum === 20000 && /^https:\/\/example\.test\/public\/arab\/pay\//.test(py.img) && store.files['arab/' + py.img.split('/arab/')[1]], py);
+  ok('operatorga xabar', pays.length === 1 && pays[0].code === 'UAAAA1');
+  await call('pay', { plan: 0, img }, 501); await call('pay', { plan: 0, img }, 501); r = await call('pay', { plan: 0, img }, 501);
+  ok('3 tadan koʻp kutilayotgan toʻlov — 400', r.status === 400, r.body);
+  const d0 = (await call('me', {}, 501)).body.prog.dinor;
+  await store.put('ar_ops', 'op1', { code: 'UAAAA1', type: 'dinor', n: 200, status: 'pending', at: '1', payId: py.id, msg: '✅ 200 dinor sotib oldingiz — balansga qoʻshildi!' });
+  r = await call('me', {}, 501);
+  ok('admin tasdiqladi: dinor qoʻshildi, botdan xabar', r.body.prog.dinor === d0 + 200 && notes.length === 1 && notes[0][0] === 'UAAAA1' && /200 dinor/.test(notes[0][1]) && (await store.get('ar_pays', py.id)).status === 'ok', { d: r.body.prog.dinor, notes });
+  r = await call('plans', {}, 501); ok('mening toʻlovlarim holati', r.body.items.some(x => x.status === 'ok'), r.body.items);
+  await api.flush();
+}
+
 (async () => {
   gameTests();
   quizTests();
@@ -412,6 +491,7 @@ async function apiTests(store) {
   const store = new MemoryStore(seed());
   await botTests(store);
   await apiTests(store);
+  await courseSocialPayTests();
   console.log(fails ? `\n❌ ${fails} ta sinov oʻtmadi` : '\n✅ Barcha sinovlar oʻtdi');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

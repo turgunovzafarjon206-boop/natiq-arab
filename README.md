@@ -57,3 +57,20 @@ reyting va profilda chiqadi, 45 soniya tegilmasa burchakda uxlaydi. 2 kun darsga
 ## Bot orqali media yuklash
 Saytda dars/mashqdagi media maydoni yonida «📲 Bot» → raqam (#12) paydo boʻladi. Admin botda «📤 Media yuklash» → #12 → video, audio,
 oddiy ovozli xabar yoki rasm yuboradi (20 MB gacha) — fayl «arab» papkasiga yuklanib, oʻsha joyda ishlaydi.
+
+## Kurslar
+«Harflar» (28 harf) — asosiy kurs. Saytda **Darslar → ⚙️ Kurslar** orqali yangi kurs qoʻshiladi:
+- **Pullik** — faqat ID’da ruxsat berilgan oʻquvchiga ochiladi (darhol).
+- **Bepul** — oldingi kurs tugagach (navbat kelganda) oʻzi ochiladi.
+Dars tahririda «Kurs» tanlanadi. ID yaratishda/tahrirlashda: qaysi kurslarga ruxsat va «🎬 Video darslarni koʻra oladi»
+(belgilanmasa — video oʻrniga izoh chiqadi, mashqlar qoladi, video dinori berilmaydi).
+
+## Reyting va obuna
+Reytingda qidiruv bor. Oʻquvchi boshqa oʻquvchi profiliga kirib dinori, tugatgan darslari, mevalari, sotib olgan buyumlari,
+obunachilar/obunalar sonini koʻradi va obuna boʻladi. Roʻyxatlarda qidiruv bor. ID kod boshqalarga koʻrsatilmaydi.
+Boshqa akkauntdan foydalanish: ID kodlar → 📱 → yangi Telegram ID (oʻquvchi botga /myid yozadi).
+
+## Dinor sotib olish
+Saytda Sozlamalar → «💳 Dinor sotib olish»: tariflar (masalan `200 = 20000`), karta raqami. Oʻquvchi ilovada tarif tanlaydi,
+kartaga toʻlaydi va chek rasmini yuklaydi → saytda «💳 Toʻlovlar» → Tasdiqlash: dinor qoʻshiladi va bot xabar yuboradi
+(«Rad etish» — sababi bilan xabar boradi). Dinorni pulga almashtirib boʻlmaydi. Operatorlarga (Sozlamalardagi chat ID’lar) chek rasmi bilan xabar keladi.

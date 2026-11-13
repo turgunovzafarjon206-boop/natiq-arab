@@ -14,6 +14,7 @@ const DEF_CFG = {
   fruitStart: 3, witherAfter: 4, fruitPrice: 2,          // 5-qismda 3 meva; keyingi 4 daraxt meva solsa — quriydi
   rw: { video: 3, q: 1, card: 1 }, replayReward: false, finalMax: 15,
   notifyChats: '', support: '', treeVideo: '',
+  dinorPlans: [], payCard: '', payName: '', payNote: '',   // dinor sotib olish: tariflar va karta
   mediaAdmins: '',
   remindOn: true, remindDays: 2, remindRepeat: 0, remindMascot: 'learn',
   remindText: '{ism}, seni sogʻindim! 🦉\n{kun} kundan beri darsga kirmading. Bugun atigi 5 daqiqa ajrat — jonlaringni toʻldir, dinor yigʻ va bogʻingni sugʻor! 🌳',
@@ -38,6 +39,28 @@ const dayDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
 
 const uniq = (arr, k) => { const s = new Set(); return arr.filter(x => !s.has(x[k]) && s.add(x[k])); };
 function shuffle(a, rnd = Math.random) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+/* ---------- kurslar: «Harflar» (28 harf) — asosiy kurs; boshqalari pullik yoki navbat kelganda (bepul) ochiladi ---------- */
+const DEF_COURSE = 'harflar';
+const courseOf = l => String((l && l.course) || DEF_COURSE);
+function courseList(raw) {
+  const C = (raw || []).filter(c => c && c.id && !c.hidden).map(c => ({ id: String(c.id), name: String(c.name || 'Kurs'), paid: !!c.paid, order: +c.order || 0, desc: String(c.desc || '') }));
+  if (!C.some(c => c.id === DEF_COURSE)) C.push({ id: DEF_COURSE, name: 'Harflar', paid: false, order: 0, desc: '' });
+  return C.sort((a, b) => a.order - b.order || (a.id === DEF_COURSE ? -1 : b.id === DEF_COURSE ? 1 : a.name.localeCompare(b.name)));
+}
+/* ID’da qaysi kurslarga ruxsat: roʻyxat berilgan boʻlsa — faqat shular; berilmagan (eski ID) — barcha bepul kurslar */
+const courseAllowed = (code, c) => !!(code && code.tester) || (Array.isArray(code && code.courses) ? code.courses.map(String).includes(c.id) : !c.paid);
+function courseStates(prog, code, courses, letters) {
+  const S = sorted(letters); let prevDone = true;
+  return (courses || []).map(c => {
+    const L = S.filter(l => courseOf(l) === c.id); const done = L.filter(l => ((prog.done || {})[l.id] || 0) >= 5).length;
+    const allowed = courseAllowed(code, c); let open = false, lock = null;
+    if (!allowed) lock = c.paid ? 'paid' : 'denied';
+    else if ((code && code.tester) || c.paid || prevDone) open = true;
+    else lock = 'turn';                                    // bepul kurs — oldingi kurs tugagach ochiladi
+    if (allowed && L.length) prevDone = done >= L.length;
+    return { id: c.id, name: c.name, paid: c.paid, desc: c.desc, allowed, open, lock, done, total: L.length };
+  });
+}
 const sorted = letters => (letters || []).filter(l => !l.hidden).slice().sort((a, b) => (+a.order || 0) - (+b.order || 0) || String(a.id).localeCompare(String(b.id)));
 
 function freshProg(code, extra) {
@@ -84,9 +107,11 @@ function partTests(L, p) { const P = (L.parts || {})[PARTS[p - 1].k] || {}; retu
 function allWords(letters) { const out = []; sorted(letters).forEach(L => (((L.parts || {}).vocab || {}).words || []).forEach(w => out.push(w))); return out; }
 
 /* qism tarkibi (ketma-ket elementlar) */
-function partItems(L, p, cfg, letters, rnd = Math.random) {
+function partItems(L, p, cfg, letters, rnd = Math.random, po = {}) {
   const P = (L.parts || {})[PARTS[p - 1].k] || {}; const items = [];
-  if (p === 1) { if (P.video) items.push({ t: 'video', url: P.video, title: P.title || '', desc: P.desc || '' }); items.push(...partTests(L, 1)); }
+  if (p === 1) { if (P.video) items.push(po.noVideo   // ID’da video yopiq: video oʻrniga izoh, mashqlar qoladi
+      ? { t: 'rule', title: P.title || 'Video dars', text: '🎬 Video darslar sizning ID’ingizda ochilmagan. Quyidagi mashqlarni bajaring.', ru: '🎬 Видеоуроки для вашего ID закрыты. Выполните упражнения ниже.', img: '' }
+      : { t: 'video', url: P.video, title: P.title || '', desc: P.desc || '' }); items.push(...partTests(L, 1)); }
   if (p === 2) { if (P.text) items.push({ t: 'rule', title: P.title || '', text: P.text, ru: P.ru || '', img: P.img || '' }); items.push(...partTests(L, 2)); }
   if (p === 3) (P.cards || []).filter(c => c && c.ar).slice(0, CARD_MAX).forEach(c => items.push({ t: 'card', ar: c.ar, tr: c.tr || '', uz: c.uz || '', ru: c.ru || '', audio: c.audio || '', img: c.img || '' }));
   if (p === 4) {
@@ -103,17 +128,19 @@ function partItems(L, p, cfg, letters, rnd = Math.random) {
 const hasContent = (L, p, cfg, letters) => partItems(L, p, cfg || DEF_CFG, letters, () => 0.5).length > 0;
 
 /* ---------- ochilish tartibi ---------- */
-function unlocked(prog, letters, lid, p, tester) {
+function unlocked(prog, letters, lid, p, tester, open) {
   if (tester) return true;
-  const S = sorted(letters); const k = S.findIndex(l => l.id === lid); if (k < 0) return false;
+  const L0 = (letters || []).find(l => l.id === lid); if (!L0 || (open && !open.has(courseOf(L0)))) return false;
+  const S = sorted(letters).filter(l => courseOf(l) === courseOf(L0)); const k = S.findIndex(l => l.id === lid); if (k < 0) return false;
   const done = (prog.done || {})[lid] || 0;
   if (p <= done + 1 && p > 1) return true;
   if (p === 1) return k === 0 || ((prog.done || {})[S[k - 1].id] || 0) >= 5 || done >= 1;
   return false;
 }
 /* hozirgi (keyingi) qism */
-function current(prog, letters) {
-  for (const L of sorted(letters)) { const d = (prog.done || {})[L.id] || 0; if (d < 5) return { lid: L.id, part: d + 1 }; }
+function current(prog, letters, open, courses) {
+  const S = sorted(letters); const list = courses ? courses.flatMap(c => S.filter(l => courseOf(l) === c.id)) : S;
+  for (const L of list) { if (open && !open.has(courseOf(L))) continue; const d = (prog.done || {})[L.id] || 0; if (d < 5) return { lid: L.id, part: d + 1 }; }
   return null;
 }
 
@@ -125,9 +152,10 @@ function markDay(prog, now = new Date()) {
 }
 
 /* takrorlash savollari: oʻtilgan joygacha (bajarilgan qismlar + hozirgi ochiq qism) */
-function reviewPool(prog, letters, cfg, rnd = Math.random) {
-  const pool = []; const W = allWords(letters);
-  for (const L of sorted(letters)) {
+function reviewPool(prog, letters, cfg, rnd = Math.random, open) {
+  const pool = []; const W = allWords(letters); const S = sorted(letters);
+  for (const cid of [...new Set(S.map(courseOf))]) { if (open && !open.has(cid)) continue;
+  for (const L of S.filter(l => courseOf(l) === cid)) {
     const d = (prog.done || {})[L.id] || 0; const upto = Math.min(5, d + 1);
     for (let p = 1; p <= upto; p++) {
       const T = partTests(L, p); pool.push(...T);
@@ -135,7 +163,7 @@ function reviewPool(prog, letters, cfg, rnd = Math.random) {
       if (p === 5 && !T.length) pool.push(...wordQs(((L.parts || {}).vocab || {}).words, L.id, W, rnd));
     }
     if (d < 5) break;
-  }
+  } }
   const seen = new Set(); return pool.filter(q => validQ(q) && !seen.has(q.id) && seen.add(q.id));
 }
 
@@ -150,9 +178,9 @@ function sessPublic(s) {
 function startLesson(prog, letters, lid, part, cfg, opts = {}) {
   cfg = cfgOf(cfg); const rnd = opts.rnd || Math.random; part = +part;
   const L = (letters || []).find(l => l.id === lid); if (!L || part < 1 || part > 5) return { error: 'Dars topilmadi' };
-  if (!unlocked(prog, letters, lid, part, opts.tester)) return { error: 'Bu qism hali ochilmagan — avvalgi qismlarni tugating' };
+  if (!unlocked(prog, letters, lid, part, opts.tester, opts.open)) return { error: 'Bu qism hali ochilmagan — avvalgi qismlarni tugating' };
   if ((prog.hearts || 0) <= 0) return { error: 'Jonlaringiz tugagan. Takrorlash orqali jon yigʻing', code: 'no_hearts' };
-  const items = partItems(L, part, cfg, letters, rnd).map(it => it.t ? it : prepQ(it, rnd));
+  const items = partItems(L, part, cfg, letters, rnd, { noVideo: !!opts.noVideo && !opts.tester }).map(it => it.t ? it : prepQ(it, rnd));
   if (!items.length) return { error: 'Bu qism hali tayyorlanmoqda', code: 'empty' };
   const replay = ((prog.done || {})[lid] || 0) >= part;
   const s = { sid: sid(), mode: 'lesson', lid, part, title: `${L.letter || ''} ${L.name || ''} · ${PARTS[part - 1].n}`.trim(), items, i: 0, gain: 0, ok: 0, bad: 0,
@@ -166,7 +194,7 @@ function startReview(prog, letters, mode, cfg, opts = {}) {
     const t = (prog.trees || []).find(x => x.lid === opts.lid); if (!t) return { error: 'Daraxt topilmadi' };
     const w = waterState(prog, t, cfg); if (!w.can) return { error: w.why };
   } else if ((prog.hearts || 0) >= cfg.maxHearts) return { error: 'Jonlaringiz toʻla ❤️', code: 'full' };
-  const pool = reviewPool(prog, letters, cfg, rnd);
+  const pool = reviewPool(prog, letters, cfg, rnd, opts.open);
   const n = mode === 'water' ? cfg.waterQ : cfg.reviewQ;
   if (!pool.length) { if (mode !== 'water') { prog.hearts = cfg.maxHearts; return { refilled: true }; } return { error: 'Takrorlash uchun savollar hali yoʻq' }; }
   let qs = shuffle(pool, rnd); while (qs.length < n && pool.length) qs = qs.concat(shuffle(pool, rnd)); qs = qs.slice(0, n);
@@ -256,19 +284,22 @@ function sell(prog, cfg) {
 }
 
 /* ---------- reyting ---------- */
-function rating(progs, myCode, limit = 50) {
+function rating(progs, myCode, limit = 50, pid = c => '', q = '') {
   const R = (progs || []).filter(p => p && p.code && !p.hideRank).map(p => ({ code: p.code, name: p.name || 'Oʻquvchi', dinor: +p.dinor || 0, lessons: p.lessons || 0, trees: (p.trees || []).length }))
     .sort((a, b) => b.dinor - a.dinor || b.lessons - a.lessons || a.name.localeCompare(b.name));
   R.forEach((r, i) => { r.rank = i + 1; });
   const mine = R.find(r => r.code === myCode) || null;
-  const strip = r => ({ rank: r.rank, name: r.name, dinor: r.dinor, lessons: r.lessons, trees: r.trees, me: r.code === myCode });
-  return { top: R.slice(0, limit).map(strip), me: mine ? strip(mine) : null, total: R.length };
+  const strip = r => ({ rank: r.rank, pid: pid(r.code), name: r.name, dinor: r.dinor, lessons: r.lessons, trees: r.trees, me: r.code === myCode });
+  const qq = String(q || '').trim().toLowerCase(); const vis = R;
+  if (qq) return { top: vis.filter(r => r.name.toLowerCase().includes(qq)).slice(0, limit).map(strip), me: mine ? strip(mine) : null, total: vis.length, q: qq };
+  return { top: vis.slice(0, limit).map(strip), me: mine ? strip(mine) : null, total: vis.length };
 }
 
 /* ---------- admin amallari (ar_ops) ---------- */
 function applyOp(prog, op, cfg) {
   cfg = cfgOf(cfg); const n = Math.round(+op.n || 0);
   if (op.type === 'dinor' || op.type === 'refund') { prog.dinor = Math.max(0, (prog.dinor || 0) + n); if (op.type === 'refund') prog.spent = Math.max(0, (prog.spent || 0) - n); }
+  else if (op.type === 'msg') { /* faqat bot xabari (masalan, toʻlov rad etildi) */ }
   else if (op.type === 'hearts') prog.hearts = Math.min(cfg.maxHearts, Math.max(0, n));
   else if (op.type === 'reset') { const keep = { code: prog.code, name: prog.name, tgId: prog.tgId, lang: prog.lang, dark: prog.dark };
     Object.keys(prog).forEach(k => delete prog[k]); Object.assign(prog, freshProg(keep.code), keep); }
@@ -276,5 +307,5 @@ function applyOp(prog, op, cfg) {
   return true;
 }
 
-module.exports = { Q, CARD_MAX, MASCOTS, DEF_CFG, PARTS, STAGES, cfgOf, tzDate, shuffle, sorted, freshProg, normQ, wordQs, cardQs, partItems, partTests, hasContent, unlocked, current,
+module.exports = { Q, CARD_MAX, DEF_COURSE, courseOf, courseList, courseAllowed, courseStates, MASCOTS, DEF_CFG, PARTS, STAGES, cfgOf, tzDate, shuffle, sorted, freshProg, normQ, wordQs, cardQs, partItems, partTests, hasContent, unlocked, current,
   markDay, reviewPool, startLesson, startReview, step, finish, grow, isDry, waterState, water, garden, sell, rating, applyOp, sessPublic, uid: sid };
