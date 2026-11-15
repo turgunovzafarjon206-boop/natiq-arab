@@ -93,7 +93,7 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
 
   /* admin amallari: dinor qoʻshish, jon, qaytarish (refund), qayta boshlash */
   async function applyOps(code, prog) {
-    const ops = (await store.find('ar_ops', 'code', code)).filter(o => o.status === 'pending').sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')));
+    const ops = (await store.where('ar_ops', [['code', 'eq', code], ['status', 'eq', 'pending']])).filter(o => o.status === 'pending').sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')));
     if (!ops.length) return 0;
     const C = await cfg(); let p = prog || await getProg(code) || G.freshProg(code, { hearts: C.maxHearts });
     for (const o of ops) { const okk = G.applyOp(p, o, C); await store.put('ar_ops', o.id, Object.assign({}, o, { status: okk ? 'done' : 'error', doneAt: clock().toISOString() }));
@@ -110,7 +110,7 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
       return { id: l.id, course: G.courseOf(l), letter: l.letter || '', name: l.name || '', tr: l.tr || '', done: d,
         parts: G.PARTS.map((P, i) => ({ p: i + 1, k: P.k, n: P.n, ok: G.hasContent(l, i + 1, C, L), open: G.unlocked(p, L, l.id, i + 1, tester, open) })) }; });
     return {
-      user: { name: p.name, code: c.id, pid: pidOf(c.id), phone: c.tgPhone || '', tester, noVideo: !!c.noVideo && !tester, group: g ? { name: g.name || '', days: g.days || [], time: g.time || '', dur: g.dur || '', meet: g.meet || '', note: g.note || '' } : null },
+      user: { name: p.name, code: c.id, pid: pidOf(c.id), phone: c.tgPhone || '', tester, noVideo: !!c.noVideo && !tester, noMarket: !!c.noMarket && !tester, group: g ? { name: g.name || '', days: g.days || [], time: g.time || '', dur: g.dur || '', meet: g.meet || '', note: g.note || '' } : null },
       cfg: { appName: C.appName, primary: C.primary, accent: C.accent, fruitPrice: C.fruitPrice, maxHearts: C.maxHearts, rw: C.rw, reviewQ: C.reviewQ, heartPer: C.heartPer,
         waterQ: C.waterQ, waterMin: C.waterMin, waterFruit: C.waterFruit, witherAfter: C.witherAfter, fruitStart: C.fruitStart, treeVideo: C.treeVideo || '', support: C.support || '', replayReward: !!C.replayReward },
       prog: { dinor: p.dinor || 0, hearts: p.hearts || 0, days: p.days || 0, lastDay: p.lastDay || '', streak: p.streak || 0, lessons: p.lessons || 0, earned: p.earned || 0, sold: p.sold || 0, spent: p.spent || 0, lang: p.lang || 'uz', dark: !!p.dark },
@@ -200,12 +200,14 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
       await store.put('ar_pays', id, x); try { await onPay(Object.assign({ id }, x)); } catch (e) { }
       return { ok: true, item: { id, dinor: x.dinor, sum: x.sum, status: x.status, at: x.at } };
     },
-    async market() {
+    async market({ c }) {
+      if (c.noMarket && !c.tester) throw new ApiError(403, 'Market sizning ID’ingizda ochilmagan', 'no_market');
       const P = (await store.list('ar_products', { ttl: 20000 })).filter(x => x.active !== false)
         .sort((a, b) => (+a.order || 0) - (+b.order || 0) || (+a.price || 0) - (+b.price || 0));
       return { items: P.map(x => ({ id: x.id, name: x.name || '', desc: x.desc || '', img: x.img || '', price: +x.price || 0, stock: x.stock === '' || x.stock == null ? null : +x.stock })) };
     },
     async buy({ c, user }, b) {
+      if (c.noMarket && !c.tester) throw new ApiError(403, 'Market sizning ID’ingizda ochilmagan', 'no_market');
       const ph = digits(b.phone); if (ph.length < 9 || ph.length > 15) throw new ApiError(400, 'Telefon raqamni toʻgʻri kiriting');
       return lock(c.id, async () => {
         const pr = await store.get('ar_products', String(b.pid || '')); if (!pr || pr.active === false) throw new ApiError(404, 'Mahsulot topilmadi');

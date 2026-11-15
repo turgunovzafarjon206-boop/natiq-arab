@@ -440,7 +440,7 @@ async function courseSocialPayTests() {
     ar_cfg: [{ id: 'main', dinorPlans: [{ dinor: 200, sum: 20000 }, { dinor: 0, sum: 5 }], payCard: '8600 1234 5678 9012', payName: 'Natiq Academy' }],
     ar_courses: [{ id: 'pro', name: 'Pro', paid: true, order: 2 }, { id: 'nav', name: 'Keyingi', paid: false, order: 3 }, { id: 'yash', name: 'Yashirin', hidden: true, order: 4 }],
     ar_letters: [L('h1', undefined, 1), L('h2', 'harflar', 2), L('p1', 'pro', 1), L('n1', 'nav', 1), L('y1', 'yash', 1), L('x1', 'oʻchgan', 9)],
-    ar_codes: [{ id: 'UAAAA1', name: 'Bir', status: 'active', tgId: 501 }, { id: 'UBBBB2', name: 'Ikki', status: 'active', tgId: 502, courses: ['harflar'], noVideo: true },
+    ar_codes: [{ id: 'UAAAA1', name: 'Bir', status: 'active', tgId: 501 }, { id: 'UBBBB2', name: 'Ikki', status: 'active', tgId: 502, courses: ['harflar'], noVideo: true, noMarket: true },
       { id: 'UCCCC3', name: 'Uch', status: 'active', tgId: 503, courses: ['harflar', 'pro'] }, { id: 'UDDDD4', name: 'Yashirin', status: 'active', tgId: 504, hideRank: true }],
     ar_tg: [{ id: '501', code: 'UAAAA1' }, { id: '502', code: 'UBBBB2' }, { id: '503', code: 'UCCCC3' }, { id: '504', code: 'UDDDD4' }],
   });
@@ -461,6 +461,8 @@ async function courseSocialPayTests() {
   // bepul kurs navbat kelganda ochiladi
   { const C2 = G.courseList([{ id: 'nav', name: 'K', order: 3 }]); const Ls = [{ id: 'a', order: 1 }, { id: 'b', order: 1, course: 'nav' }];
     ok('bepul kurs — Harflar tugagach ochiladi', !G.courseStates({ done: { a: 4 } }, {}, C2, Ls)[1].open && G.courseStates({ done: { a: 5 } }, {}, C2, Ls)[1].open); }
+  r = await call('market', {}, 502); const r2 = await call('buy', { pid: 'p1', phone: '901234567' }, 502); const r3 = await call('market', {}, 501);
+  ok('Market yopiq ID: market va xarid — 403, boshqasida ochiq', r.status === 403 && r2.status === 403 && r3.status === 200 && (await call('me', {}, 502)).body.user.noMarket === true && !(await call('me', {}, 501)).body.user.noMarket, [r.status, r2.status, r3.status]);
   // video yopiq
   r = await call('lesson', { lid: 'h1', part: 1 }, 502); const it = r.body.sess.items;
   ok('video yopiq ID: video oʻrniga izoh, mashqlar bor', it[0].t === 'rule' && /Video darslar/.test(it[0].text) && !it.some(x => x.t === 'video') && it.some(x => x.t === 'q'), it.map(x => x.t));

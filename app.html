@@ -1089,8 +1089,8 @@ function profileView(){
  h+=`<button class="help" onclick="helpMe()">${stk('headset')}<span class="grow"><b>${T('Yordam')}</b><small>${T('Operator bilan Telegramda yozishing')}</small></span>${IC.chev.replace('<svg','<svg style="width:22px;height:22px"')}</button>
   <div class="list"><button class="li" onclick="openProfile(ME.user.pid)">${stk('user')}<span class="t">${T('Mening profilim')}<small>${T('Obunachilar va obunalar')}</small></span>${chev}</button>
   <button class="li" onclick="openBuy()">${stk('coin')}<span class="t">${T('Dinor sotib olish')}<small>${T('Kartaga toʻlang')} · ${T('Chek rasmini yuklang')}</small></span>${chev}</button></div>
-  <div class="list"><button class="li" onclick="openSub('market')">${stk('bag')}<span class="t">${T('Market')}<small>${T('Dinorga sovgʻalar')}</small></span>${chev}</button>
-  <button class="li" onclick="openSub('orders')">${stk('box')}<span class="t">${T('Buyurtmalarim')}</span>${chev}</button></div>
+  ${u.noMarket?'':`<div class="list"><button class="li" onclick="openSub('market')">${stk('bag')}<span class="t">${T('Market')}<small>${T('Dinorga sovgʻalar')}</small></span>${chev}</button>
+  <button class="li" onclick="openSub('orders')">${stk('box')}<span class="t">${T('Buyurtmalarim')}</span>${chev}</button></div>`}
   <div class="list"><div class="li" style="flex-wrap:wrap">${stk('globe')}<span class="t">${T('Til')}</span>
    <div class="seg nt" style="width:100%;margin-top:4px">${[['uz','Lotin'],['cy','Кирилл'],['ru','Русский']].map(([k,n])=>`<button class="${LANG===k?'on':''}" onclick="setLang('${k}')">${n}</button>`).join('')}</div></div>
    <button class="li" onclick="setDark()">${stk('moon')}<span class="t">${T('Tungi rejim')}</span><span class="tg ${p.dark?'on':''}"></span></button></div>`;
