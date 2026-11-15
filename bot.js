@@ -75,11 +75,29 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     if (!M.length) return ctx.reply('Yuklanishi kerak boʻlgan media yoʻq ✅\nSaytda darsga video yoki ovoz qoʻshayotganda «📲 Bot» tugmasini bosing — raqam paydo boʻladi.', { reply_markup: ADMIN_KB });
     return ctx.reply('📤 Qaysi raqamga media yuborasiz? Tugmani bosing yoki raqamni yozing:', { reply_markup: { inline_keyboard: M.map(m => [{ text: `#${m.id} ${KIND_E[m.kind] || ''} ${String(m.label || '').slice(0, 42)}`, callback_data: 'ms:' + m.id }]) } });
   }
+  /* saytda «📲 Bot» bosilsa — media yuklaydiganlarga xabar: arabcha matn, oʻqilishi va «Yuklash» tugmasi */
+  const adminList = async () => { const C = await getCfg(); return [...new Set([...String(C.mediaAdmins || '').split(/[\s,;]+/), ...adminIds].map(x => String(x).trim()).filter(x => /^-?\d+$/.test(x)))]; };
+  const slotText = m => { const need = { audio: 'ovoz yozib yuborish kerak', video: 'video yuborish kerak', image: 'rasm yuborish kerak' }[m.kind] || 'media yuborish kerak';
+    const L = [`${KIND_E[m.kind] || '📎'} <b>#${m.id}</b> — ${need}`]; if (m.label) L.push('📍 ' + esc(m.label));
+    if (m.ar) L.push('', `<b>${esc(m.ar)}</b>`); if (m.tr) L.push(`Oʻqilishi: <i>${esc(m.tr)}</i>`);
+    L.push('', `Tugmani bosing va ${m.kind === 'audio' ? 'oddiy ovozli xabar (yoki audio fayl)' : m.kind === 'video' ? 'videoni' : m.kind === 'image' ? 'rasmni' : 'faylni'} yuboring.`); return L.join('\n'); };
+  async function processMediaNotify() {
+    const since = Date.now() - 2 * 86400e3;
+    const M = (await store.where('ar_media', [['status', 'eq', 'wait']])).filter(m => m.status === 'wait' && !m.notified && Date.parse(m.at || 0) > since)
+      .sort((a, b) => (+a.id) - (+b.id)).slice(0, 20);
+    if (!M.length) return 0; const A = await adminList(); if (!A.length) return 0; let sent = 0;
+    for (const m of M) {
+      await store.put('ar_media', m.id, Object.assign({}, m, { notified: now() }));   // avval belgilanadi — ikki marta yuborilmaydi
+      for (const id of A) { try { await bot.api.sendMessage(id, slotText(m), { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: `📤 #${m.id} ga yuklash`, callback_data: 'ms:' + m.id }]] } }); sent++; }
+        catch (e) { console.error('media xabar', id, e.message); if (e instanceof GrammyError && e.parameters && e.parameters.retry_after) await sleep(e.parameters.retry_after * 1000); } }
+    }
+    return sent;
+  }
   async function pickSlot(ctx, n) {
     const m = await store.get('ar_media', String(n)); if (!m) return ctx.reply(`#${n} raqamli media topilmadi. Roʻyxat: «📤 Media yuklash»`);
     const tg = (await store.get('ar_tg', ctx.from.id)) || { tgId: ctx.from.id };
     await store.put('ar_tg', ctx.from.id, Object.assign(tg, { mediaSlot: String(n), mediaAt: now() }));
-    return ctx.reply(`📥 #${n} — «${m.label || ''}»\nEndi ${KIND_N[m.kind] || 'fayl'} yuboring${big ? ' (hajmi cheklanmagan)' : ' (20 MB gacha)'}.${m.status === 'ready' ? '\n⚠️ Bu raqamga avval yuklangan — yangisi almashtiradi.' : ''}\nBekor qilish: /cancel`);
+    return ctx.reply(`📥 #${n} — «${m.label || ''}»${m.ar ? `\n\n${m.ar}${m.tr ? '\nOʻqilishi: ' + m.tr : ''}\n` : ''}\nEndi ${KIND_N[m.kind] || 'fayl'} yuboring${big ? ' (hajmi cheklanmagan)' : ' (20 MB gacha)'}.${m.status === 'ready' ? '\n⚠️ Bu raqamga avval yuklangan — yangisi almashtiradi.' : ''}\nBekor qilish: /cancel`);
   }
   bot.command('media', async ctx => { if (ctx.chat.type !== 'private') return; if (!(await isAdmin(ctx.from.id))) return ctx.reply(`Bu buyruq faqat adminlar uchun. Sizning ID: ${ctx.from.id}`); return mediaList(ctx); });
   bot.command('cancel', async ctx => { const tg = await store.get('ar_tg', ctx.from.id); if (tg && tg.mediaSlot) { await store.put('ar_tg', ctx.from.id, Object.assign(tg, { mediaSlot: null })); return ctx.reply('Bekor qilindi.', { reply_markup: ADMIN_KB }); } });
@@ -270,7 +288,7 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
   }
 
   bot.catch(err => console.error('bot xatosi:', err.error && err.error.message || err.message));
-  return { bot, welcome, notifyOrder, notifyPay, notifyCode, processMsgs, processReminders, normCode, setMenu };
+  return { bot, welcome, notifyOrder, notifyPay, notifyCode, processMediaNotify, processMsgs, processReminders, normCode, setMenu };
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
 

@@ -292,6 +292,17 @@ async function botTests(store) {
     await A2.bot.handleUpdate(msg(ADM, { voice: { file_id: 'F', file_unique_id: 'u', duration: 2, mime_type: 'audio/ogg', file_size: 4 } }));
     const md = await store.get('ar_media', '7');
     ok('ovozli xabar Telegramda qoldi (Supabase’ga yuklanmadi), /m/7 orqali beriladi', md.status === 'ready' && md.url === 'https://arab.example/m/7' && md.fileId === 'F' && md.src === 'voice' && md.tg && !Object.keys(store.files).some(k => /arab\/tg\/7-/.test(k)) && require('fs').existsSync(require('path').join(MDIR, '7.' + md.ext)), md);
+    {
+      await store.put('ar_media', '30', { kind: 'audio', label: 'Bā · Talaffuz #3', ar: 'بَاب', tr: 'baab', status: 'wait', at: new Date().toISOString() });
+      await store.put('ar_media', '31', { kind: 'audio', label: 'Eski', ar: 'تَ', status: 'wait', at: new Date(Date.now() - 5 * 86400e3).toISOString() });
+      const n0 = C3.length; const n = await A2.processMediaNotify(); const S = C3.slice(n0).filter(c => c.method === 'sendMessage');
+      ok('«📲 Bot» → media yuklaydiganlarga xabar: arabcha matn, oʻqilishi, «Yuklash» tugmasi', n === 2 && S.map(c => String(c.payload.chat_id)).sort().join() === '555,999'
+        && S.every(c => /بَاب/.test(c.payload.text) && /baab/.test(c.payload.text) && /#30/.test(c.payload.text) && c.payload.reply_markup.inline_keyboard[0][0].callback_data === 'ms:30'), S.map(c => c.payload));
+      ok('qayta yuborilmaydi, eski (5 kunlik) raqamga xabar ketmaydi', (await A2.processMediaNotify()) === 0 && !!(await store.get('ar_media', '30')).notified && !(await store.get('ar_media', '31')).notified);
+      await A2.bot.handleUpdate({ update_id: uid++, callback_query: { id: 'q9', from: ADM, chat_instance: 'x', data: 'ms:30', message: { message_id: 4, date: 0, chat: { id: 555, type: 'private' } } } });
+      ok('tugma bosilsa — raqam tanlanadi, matn yana koʻrsatiladi', /#30/.test(L3().payload.text) && /بَاب/.test(L3().payload.text) && /ovozli xabar/.test(L3().payload.text), L3().payload.text);
+      await store.del('ar_media', '30'); await store.del('ar_media', '31'); await A2.bot.handleUpdate(txt(ADM, '/cancel'));
+    }
     ok('admin raqamni yozsa ham tanlanadi', await (async () => { await A2.bot.handleUpdate(txt(ADM, '#8')); return /#8/.test(C3.filter(c => c.method === 'sendMessage').pop().payload.text); })());
 
     // katta fayl (>20 MB): MTProto bilan — Telegramda qoladi, /m/N orqali oqim

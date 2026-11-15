@@ -121,6 +121,7 @@ async function main() {
   let busy = false;
   const tick = async () => { if (busy) return; busy = true;
     try { await A.processMsgs(); } catch (e) { console.error('msgs', e.message); }
+    try { await A.processMediaNotify(); } catch (e) { console.error('media xabar', e.message); }
     try { const ops = (await store.where('ar_ops', [['status', 'eq', 'pending']])).filter(o => o.status === 'pending'); const codes = [...new Set(ops.map(o => o.code))];
       for (const c of codes) await api.lock(c, () => api.applyOps(c)); } catch (e) { console.error('ops', e.message); }
     busy = false; };
