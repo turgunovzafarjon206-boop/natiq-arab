@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { SupabaseStore, MemoryStore } = require('./store');
 const { createApi } = require('./api');
-const { createArabBot } = require('./bot');
+const { createArabBot, toM4a } = require('./bot');
 const { createBig } = require('./mtproto');
 
 /* GitHub’da fayllar bir papkada (app.html index.js yonida) yoki public/ ichida boʻlishi mumkin */
@@ -22,7 +22,24 @@ const APP_FILE = [path.join(__dirname, 'app.html'), path.join(__dirname, '..', '
 const MASCOTS = ['read', 'thumbs', 'cheer', 'bravo', 'think', 'goodjob', 'cool', 'party', 'love', 'sleep', 'write', 'learn', 'peek', 'walk', 'stars', 'trophy'];
 const assetPath = f => [path.join(__dirname, f), path.join(__dirname, '..', 'public', f)].find(x => fs.existsSync(x)) || null;
 
-function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), info = () => ({}), store, big }) {
+/* Telegramda saqlangan media keshi: bir marta yuklab olinadi (ovozli xabar m4a ga aylantiriladi), keyin diskdan beriladi */
+function createMediaCache({ dir, download, convert }) {
+  const pend = new Map();
+  async function file(n, md) {
+    const p = path.join(dir, `${String(n).replace(/\D/g, '')}.${String(md.ext || 'bin').replace(/[^a-z0-9]/gi, '')}`);
+    try { if (fs.statSync(p).size > 0) return p; } catch (e) { }
+    if (!md.fileId || !download) return null;
+    if (pend.has(p)) return pend.get(p);
+    const pr = (async () => { let buf = await download(md.fileId);
+      if (md.conv && convert) { const c = await convert(buf, md.tgExt || 'ogg'); if (c && c.length) buf = c; }
+      fs.mkdirSync(dir, { recursive: true }); const tmp = p + '.' + process.pid + '.tmp'; fs.writeFileSync(tmp, buf); fs.renameSync(tmp, p); return p; })()
+      .finally(() => pend.delete(p));
+    pend.set(p, pr); return pr;
+  }
+  return { file, dir };
+}
+
+function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), info = () => ({}), store, big, media = null }) {
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x'); const p = url.pathname.replace(/\/+$/, '') || '/';
     const send = (st, body, type = 'application/json; charset=utf-8', extra = {}) => { res.writeHead(st, Object.assign({ 'Content-Type': type, 'X-Content-Type-Options': 'nosniff' }, extra)); res.end(body); };
@@ -33,6 +50,17 @@ function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), 
       const mm = /^\/m\/(\d+)$/.exec(p);
       if (req.method === 'GET' && mm && store) {
         const md = await store.get('ar_media', mm[1]);
+        if (md && md.fileId && media) {   // Telegramda saqlangan (20 MB gacha) — server keshidan, Range bilan
+          let f = null; try { f = await media.file(mm[1], md); } catch (e) { console.error('media', mm[1], e.message); }
+          if (!f) return send(404, JSON.stringify({ error: 'Topilmadi' }));
+          const size = fs.statSync(f).size; const mime = md.mime || 'application/octet-stream';
+          const rg = /bytes=(\d*)-(\d*)/.exec(req.headers.range || ''); let start = 0, end = size - 1, st = 200;
+          if (rg && size) { if (rg[1] === '' && rg[2]) { start = Math.max(0, size - +rg[2]); } else { start = +rg[1] || 0; if (rg[2]) end = Math.min(+rg[2], size - 1); } st = 206; }
+          if (start > end) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); return res.end(); }
+          const head = { 'Content-Type': mime, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, 'Cache-Control': 'public, max-age=604800', 'Access-Control-Allow-Origin': '*' };
+          if (st === 206) head['Content-Range'] = `bytes ${start}-${end}/${size}`;
+          res.writeHead(st, head); return fs.createReadStream(f, { start, end }).pipe(res);
+        }
         if (!md || !md.msgId || !big) return send(404, JSON.stringify({ error: 'Topilmadi' }));
         const size = +md.size || big.sizeOf(await big.media(md.msgId)); const mime = md.mime || 'application/octet-stream';
         const rg = /bytes=(\d*)-(\d*)/.exec(req.headers.range || ''); let start = 0, end = size - 1, st = 200;
@@ -76,11 +104,15 @@ async function main() {
   const api = createApi({ store, token, onOrder: o => A && A.notifyOrder(o), onPay: x => A && A.notifyPay(x), onNotify: (code, t) => A && A.notifyCode(code, t) });
   const big = createBig({ apiId: env.TG_API_ID, apiHash: env.TG_API_HASH, token });
   if (big) big.connect().then(() => console.log('MTProto ulandi — katta fayllar yuklanadi')).catch(e => console.error('MTProto:', e.message));
-  A = createArabBot({ token, store, appUrl, big, cfg: () => api.cfg(), asset: assetPath, adminIds: String(env.ADMIN_IDS || '').split(/[\s,;]+/).filter(Boolean) });
+  const mediaDir = env.MEDIA_DIR || path.join(require('os').tmpdir(), 'natiq-media');
+  A = createArabBot({ token, store, appUrl, big, mediaDir, cfg: () => api.cfg(), asset: assetPath, adminIds: String(env.ADMIN_IDS || '').split(/[\s,;]+/).filter(Boolean) });
   const bot = A.bot;
   await bot.init();
   const started = new Date().toISOString();
-  const server = createServer({ api, store, big, info: () => ({ bot: bot.botInfo && bot.botInfo.username, appUrl, started }) });
+  const media = createMediaCache({ dir: mediaDir, convert: toM4a, download: async fileId => {
+    const f = await A.bot.api.getFile(fileId); const r = await fetch(`https://api.telegram.org/file/bot${token}/${f.file_path}`);
+    if (!r.ok) throw new Error('Telegram fayli olinmadi (HTTP ' + r.status + ')'); return Buffer.from(await r.arrayBuffer()); } });
+  const server = createServer({ api, store, big, media, info: () => ({ bot: bot.botInfo && bot.botInfo.username, appUrl, started }) });
   const port = +env.PORT || 3000; server.listen(port, () => console.log('HTTP :' + port, appUrl || ''));
 
   try { await bot.api.setMyCommands([{ command: 'start', description: 'Boshlash' }, { command: 'app', description: 'Ilovani ochish' }]); } catch (e) { }
@@ -89,7 +121,7 @@ async function main() {
   let busy = false;
   const tick = async () => { if (busy) return; busy = true;
     try { await A.processMsgs(); } catch (e) { console.error('msgs', e.message); }
-    try { const ops = (await store.list('ar_ops', { fresh: true })).filter(o => o.status === 'pending'); const codes = [...new Set(ops.map(o => o.code))];
+    try { const ops = (await store.where('ar_ops', [['status', 'eq', 'pending']])).filter(o => o.status === 'pending'); const codes = [...new Set(ops.map(o => o.code))];
       for (const c of codes) await api.lock(c, () => api.applyOps(c)); } catch (e) { console.error('ops', e.message); }
     busy = false; };
   setInterval(tick, 10000); setTimeout(tick, 3000);
@@ -105,4 +137,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(e => { console.error(e); process.exit(1); });
-module.exports = { createServer, MASCOTS, assetPath };
+module.exports = { createServer, createMediaCache, MASCOTS, assetPath };

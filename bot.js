@@ -24,7 +24,7 @@ const digits = s => String(s || '').replace(/\D/g, '');
 const tgName = u => [u.first_name, u.last_name].filter(Boolean).join(' ');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new Date(), asset = () => null, adminIds = [], fetchImpl, big = null }) {
+function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new Date(), asset = () => null, adminIds = [], fetchImpl, big = null, mediaDir = null }) {
   const bot = new Bot(token, botOpts);
   const getCfg = cfg || (async () => G.cfgOf(await store.get('ar_cfg', 'main')));
   const now = () => clock().toISOString();
@@ -117,11 +117,17 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
       const r = await doFetch(`https://api.telegram.org/file/bot${token}/${file.file_path}`); if (!r.ok) throw new Error('Telegram fayli olinmadi (HTTP ' + r.status + ')');
       const buf = Buffer.from(await r.arrayBuffer());
       let ext = (String(file.file_path || '').split('.').pop() || '').toLowerCase(); if (!/^[a-z0-9]{2,5}$/.test(ext)) ext = { video: 'mp4', audio: 'ogg', image: 'jpg' }[kind]; if (ext === 'oga') ext = 'ogg';
-      let data = buf;
+      let data = buf; const origExt = ext;
       if (kind === 'audio' && (/^(ogg|oga|opus|webm|wav|amr)$/.test(ext) || /ogg|opus|webm/.test(mime))) { const c = await toM4a(buf, ext); if (c && c.length) { data = c; ext = 'm4a'; mime = 'audio/mp4'; } }
-      const path = `tg/${n}-${Date.now()}.${ext}`; await store.upload('arab', path, data, mime);
-      const url = store.publicUrl ? store.publicUrl('arab', path) : '';
-      await store.put('ar_media', n, Object.assign(slot, { status: 'ready', url, path, mime, size: data.length, src: m.voice ? 'voice' : kind, by: ctx.from.id, byName: tgName(ctx.from), at: now() }));
+      const base = String(appUrl || '').replace(/\/app\/?$/, '');
+      if (base && mediaDir) {   // fayl Telegramda qoladi: ilova uni server orqali beradi — Supabase trafigi (egress) sarflanmaydi
+        const fs = require('fs'), pth = require('path'); fs.mkdirSync(mediaDir, { recursive: true }); fs.writeFileSync(pth.join(mediaDir, `${n}.${ext}`), data);
+        await store.put('ar_media', n, Object.assign(slot, { status: 'ready', url: `${base}/m/${n}`, fileId: f.file_id, ext, tgExt: origExt, conv: ext !== origExt, mime, size: data.length, src: m.voice ? 'voice' : kind, tg: true, path: null, by: ctx.from.id, byName: tgName(ctx.from), at: now() }));
+      } else {
+        const path = `tg/${n}-${Date.now()}.${ext}`; await store.upload('arab', path, data, mime);
+        const url = store.publicUrl ? store.publicUrl('arab', path) : '';
+        await store.put('ar_media', n, Object.assign(slot, { status: 'ready', url, path, mime, size: data.length, src: m.voice ? 'voice' : kind, by: ctx.from.id, byName: tgName(ctx.from), at: now() }));
+      }
       await store.put('ar_tg', ctx.from.id, Object.assign(tg, { mediaSlot: null }));
       await ctx.reply(`✅ #${n} yuklandi — «${slot.label || ''}».\nIlovada 15 soniya ichida paydo boʻladi.`, { reply_markup: ADMIN_KB });
       const left = (await store.list('ar_media', { fresh: true })).filter(x => x.status !== 'ready').length; if (left) return mediaList(ctx);
@@ -213,7 +219,7 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
 
   /* ommaviy xabarlar (saytdan: ar_msgs, status = pending) */
   async function processMsgs() {
-    const M = (await store.list('ar_msgs', { fresh: true })).filter(m => m.status === 'pending');
+    const M = (await store.where('ar_msgs', [['status', 'eq', 'pending']])).filter(m => m.status === 'pending');   // faqat navbatdagilar — trafik tejaladi
     if (!M.length) return 0;
     const C = await getCfg(); const codes = (await store.list('ar_codes', { fresh: true })).filter(c => c.status === 'active' && c.tgId);
     for (const m of M) {

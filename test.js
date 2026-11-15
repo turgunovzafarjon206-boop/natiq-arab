@@ -7,7 +7,7 @@ const { createArabBot, normCode } = require('./bot');
 const { createServer } = require('./index');
 
 const TOKEN = '777000:ARAB_TEST_TOKEN';
-let BIG_FAKE = null;
+let BIG_FAKE = null, MEDIA_DIR_T = null;
 let fails = 0; const ok = (name, cond, got) => { if (cond) console.log('  ✓ ' + name); else { fails++; console.log('  ✗ ' + name + (got !== undefined ? '  got: ' + JSON.stringify(got) : '')); } };
 const Q = (q, opts, a, x = {}) => Object.assign({ q, opts, a }, x);
 
@@ -274,7 +274,8 @@ async function botTests(store) {
     await store.put('ar_media', '7', { kind: 'audio', label: 'Bā · Talaffuz · 1-karta', status: 'wait' });
     await store.put('ar_media', '8', { kind: 'video', label: 'Bā · Video dars', status: 'wait' });
     await store.patch('ar_cfg', 'main', { mediaAdmins: '555' });
-    const A2 = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app', adminIds: ['999'], fetchImpl: async url => ({ ok: /file\/bot777000:ARAB_TEST_TOKEN\/voice\/f1\.oga$/.test(url), status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer }),
+    const MDIR = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'nmed-')); MEDIA_DIR_T = MDIR;
+    const A2 = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app', adminIds: ['999'], mediaDir: MDIR, fetchImpl: async url => ({ ok: /file\/bot777000:ARAB_TEST_TOKEN\/voice\/f1\.oga$/.test(url), status: 200, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer }),
       botOpts: { botInfo: { id: 7, is_bot: true, first_name: 'N', username: 'natiq_arab_bot', can_join_groups: false, can_read_all_group_messages: false, supports_inline_queries: false } } });
     const C3 = []; A2.bot.api.config.use(async (prev, method, payload) => { C3.push({ method, payload: JSON.parse(JSON.stringify(payload || {})) });
       return { ok: true, result: method === 'getFile' ? { file_id: 'F', file_unique_id: 'u', file_path: 'voice/f1.oga' } : method === 'answerCallbackQuery' ? true : { message_id: 1, date: 0, chat: { id: 555, type: 'private' } } }; });
@@ -290,7 +291,7 @@ async function botTests(store) {
     ok('notoʻgʻri tur rad etiladi', /kerak/.test(L3().payload.text));
     await A2.bot.handleUpdate(msg(ADM, { voice: { file_id: 'F', file_unique_id: 'u', duration: 2, mime_type: 'audio/ogg', file_size: 4 } }));
     const md = await store.get('ar_media', '7');
-    ok('ovozli xabar yuklandi va saqlandi', md.status === 'ready' && /\/arab\/tg\/7-\d+\.ogg$/.test(md.url) && md.src === 'voice' && store.files['arab/' + md.path], md);
+    ok('ovozli xabar Telegramda qoldi (Supabase’ga yuklanmadi), /m/7 orqali beriladi', md.status === 'ready' && md.url === 'https://arab.example/m/7' && md.fileId === 'F' && md.src === 'voice' && md.tg && !Object.keys(store.files).some(k => /arab\/tg\/7-/.test(k)) && require('fs').existsSync(require('path').join(MDIR, '7.' + md.ext)), md);
     ok('admin raqamni yozsa ham tanlanadi', await (async () => { await A2.bot.handleUpdate(txt(ADM, '#8')); return /#8/.test(C3.filter(c => c.method === 'sendMessage').pop().payload.text); })());
 
     // katta fayl (>20 MB): MTProto bilan — Telegramda qoladi, /m/N orqali oqim
@@ -324,7 +325,11 @@ async function apiTests(store) {
   console.log('Mini App API');
   const orders = [];
   const api = createApi({ store, token: TOKEN, onOrder: async o => orders.push(o) });
-  const srv = createServer({ api, store, big: BIG_FAKE, appHtml: () => '<html>app</html>' }); await new Promise(r => srv.listen(0, r));
+  const { createMediaCache } = require('./index');
+  const MD2 = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'nmed2-'));
+  let dl = 0; const media = createMediaCache({ dir: MD2, download: async id => { dl++; return Buffer.from('TGAUDIO-' + id + '-'.repeat(40)); } });
+  await store.put('ar_media', '21', { kind: 'audio', status: 'ready', url: 'https://arab.example/m/21', fileId: 'FX', ext: 'ogg', mime: 'audio/ogg', tg: true });
+  const srv = createServer({ api, store, big: BIG_FAKE, media, appHtml: () => '<html>app</html>' }); await new Promise(r => srv.listen(0, r));
   const port = srv.address().port;
   const call = (name, body, initData) => new Promise((res, rej) => {
     const data = JSON.stringify(Object.assign({ initData }, body || {}));
@@ -343,6 +348,9 @@ async function apiTests(store) {
     ok('katta media oqimi: Range 206', r1.st === 206 && r1.b === 'abcdefghij' && r1.cr === 'bytes 10-19/200' && r1.ct === 'video/mp4', r1);
     const r2 = await new Promise(res => http.get({ port, path: '/m/9' }, r => { let n = 0; r.on('data', c => n += c.length); r.on('end', () => res({ st: r.statusCode, n })); }));
     ok('katta media: toʻliq 200', r2.st === 200 && r2.n === 200, r2); }
+  { const g1 = await new Promise(res => http.get({ port, path: '/m/21', headers: { Range: 'bytes=0-6' } }, r => { let b = ''; r.on('data', c => b += c); r.on('end', () => res({ st: r.statusCode, b, ct: r.headers['content-type'] })); }));
+    const g2 = await new Promise(res => http.get({ port, path: '/m/21' }, r => { let b = ''; r.on('data', c => b += c); r.on('end', () => res({ st: r.statusCode, b })); }));
+    ok('Telegramdagi media: bir marta yuklanadi, keyin keshdan (Range 206)', g1.st === 206 && g1.b === 'TGAUDIO' && g1.ct === 'audio/ogg' && g2.st === 200 && g2.b.startsWith('TGAUDIO-FX') && dl === 1, { g1, dl }); }
 
   { const m = await get('/mascot-bravo.webp'); ok('maskot rasmi beriladi', m.status === 200 && m.type === 'image/webp'); ok('notanish fayl — 404', (await get('/mascot-xxx.webp')).status === 404 && (await get('/mascot-../index.js')).status === 404); }
   let r = await call('me', {}, 'yolgon');
@@ -389,7 +397,7 @@ async function apiTests(store) {
     const L = await store.get('ar_letters', 'l1'); L.parts.cards.cards[0].audio = 'tg:7'; L.parts.cards.cards[1].audio = 'tg:99'; await store.put('ar_letters', 'l1', L);
     await new Promise(r => setTimeout(r, 10));
     const rr = await call('lesson', { lid: 'l1', part: 3 }, IDT); const cs = rr.body.sess && rr.body.sess.items;
-    ok('bot orqali yuklangan audio darsda ishlaydi', cs && /^https:\/\/example\.test\/public\/arab\/tg\/7-/.test(cs[0].audio) && cs[1].audio === '', cs && cs.map(x => x.audio));
+    ok('bot orqali yuklangan audio darsda ishlaydi', cs && cs[0].audio === 'https://arab.example/m/7' && cs[1].audio === '', cs && cs.map(x => x.audio));
   }
   // kartaga yozilgan ovoz shu matnli testlarda ham ishlaydi; bir necha soʻzli matn — soʻzlar audiosi ketma-ket
   {
