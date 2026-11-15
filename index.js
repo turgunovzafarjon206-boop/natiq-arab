@@ -14,6 +14,9 @@ const { SupabaseStore, MemoryStore } = require('./store');
 const { createApi } = require('./api');
 const { createArabBot, toM4a } = require('./bot');
 const { createBig } = require('./mtproto');
+/* eski store.js bilan ham ishlasin (where boʻlmasa — roʻyxatdan filtrlanadi) */
+const qWhere = (st, coll, conds) => typeof st.where === 'function' ? st.where(coll, conds)
+  : st.list(coll, { fresh: true }).then(L => L.filter(r => conds.every(([f, op, v]) => op === 'in' ? v.map(String).includes(String(r[f])) : op === 'gt' ? String(r[f] == null ? '' : r[f]) > String(v) : String(r[f]) === String(v))));
 
 /* GitHub’da fayllar bir papkada (app.html index.js yonida) yoki public/ ichida boʻlishi mumkin */
 const APP_FILE = [path.join(__dirname, 'app.html'), path.join(__dirname, '..', 'public', 'app.html')].find(f => fs.existsSync(f)) || path.join(__dirname, 'app.html');
@@ -122,7 +125,7 @@ async function main() {
   const tick = async () => { if (busy) return; busy = true;
     try { await A.processMsgs(); } catch (e) { console.error('msgs', e.message); }
     try { await A.processMediaNotify(); } catch (e) { console.error('media xabar', e.message); }
-    try { const ops = (await store.where('ar_ops', [['status', 'eq', 'pending']])).filter(o => o.status === 'pending'); const codes = [...new Set(ops.map(o => o.code))];
+    try { const ops = (await qWhere(store, 'ar_ops', [['status', 'eq', 'pending']])).filter(o => o.status === 'pending'); const codes = [...new Set(ops.map(o => o.code))];
       for (const c of codes) await api.lock(c, () => api.applyOps(c)); } catch (e) { console.error('ops', e.message); }
     busy = false; };
   setInterval(tick, 10000); setTimeout(tick, 3000);

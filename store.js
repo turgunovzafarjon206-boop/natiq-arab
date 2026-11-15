@@ -16,17 +16,33 @@ class SupabaseStore {
     this.cache = new Map();
   }
   _ok(r) { if (r.error) throw new Error(r.error.message); return r.data; }
+  /* oʻzgarish belgisi: yozuvlar soni + oxirgi oʻzgarish vaqti (bir necha bayt). Toʻplam oʻzgarmagan boʻlsa —
+     butun roʻyxat qayta yuklanmaydi (Supabase trafigi — egress — tejaladi) */
+  async stamp(coll) {
+    const r = await this.sb.from('records').select('updated_at', { count: 'exact' }).eq('coll', coll).order('updated_at', { ascending: false }).limit(1);
+    if (r.error) throw new Error(r.error.message); return (r.count || 0) + '|' + ((r.data && r.data[0] && r.data[0].updated_at) || '');
+  }
   async list(coll, { fresh = false, ttl = 20000 } = {}) {
     const c = this.cache.get(coll);
     if (!fresh && c && Date.now() - c.at < ttl) return c.rows;
+    let stamp = null; try { stamp = await this.stamp(coll); } catch (e) { }
+    if (c && stamp && c.stamp === stamp) { c.at = Date.now(); return c.rows; }
     const out = []; let from = 0;
     for (;;) {
       const data = this._ok(await this.sb.from('records').select('id,data').eq('coll', coll).range(from, from + 999));
       out.push(...data); if (data.length < 1000) break; from += 1000;
     }
     const rows = out.map(r => Object.assign({}, r.data, { id: r.id }));
-    this.cache.set(coll, { at: Date.now(), rows });
+    this.cache.set(coll, { at: Date.now(), rows, stamp });
     return rows;
+  }
+  /* faqat kerakli yozuvlar: [[maydon, 'eq'|'in'|'gt', qiymat], …] — navbatlar (pending) uchun */
+  async where(coll, conds) {
+    let q = this.sb.from('records').select('id,data').eq('coll', coll);
+    for (const [f, op, v] of conds) { const k = 'data->>' + f; q = op === 'in' ? q.in(k, v.map(String)) : op === 'gt' ? q.gt(k, String(v)) : q.eq(k, String(v)); }
+    const out = []; let from = 0;
+    for (;;) { const data = this._ok(await q.range(from, from + 999)); out.push(...data); if (data.length < 1000) break; from += 1000; }
+    return out.map(r => Object.assign({}, r.data, { id: r.id }));
   }
   async find(coll, field, value) {
     const data = this._ok(await this.sb.from('records').select('id,data').eq('coll', coll).eq('data->>' + field, String(value)));
@@ -102,7 +118,7 @@ class SupabaseStore {
     this._ok(await this.sb.from('profiles').upsert({ id, name, phone, role }));
     this.cache.delete('#profiles'); return id;
   }
-  clear() { this.cache.clear(); }
+  clear() { this.cache.delete('#profiles'); for (const c of this.cache.values()) c.at = 0; }   // muddati tugaydi, lekin oʻzgarmagan toʻplam qayta yuklanmaydi
 }
 
 class MemoryStore {
@@ -113,6 +129,7 @@ class MemoryStore {
   _c(coll) { return this.db[coll] || (this.db[coll] = new Map()); }
   async list(coll) { return [...this._c(coll).values()].map(r => JSON.parse(JSON.stringify(r))); }
   async find(coll, field, value) { return (await this.list(coll)).filter(r => String(r[field]) === String(value)); }
+  async where(coll, conds) { return (await this.list(coll)).filter(r => conds.every(([f, op, v]) => op === 'in' ? v.map(String).includes(String(r[f])) : op === 'gt' ? String(r[f] == null ? '' : r[f]) > String(v) : String(r[f]) === String(v))); }
   async get(coll, id) { const r = this._c(coll).get(String(id)); return r ? JSON.parse(JSON.stringify(r)) : null; }
   async put(coll, id, data) { const d = Object.assign({}, JSON.parse(JSON.stringify(data)), { id: String(id) }); this._c(coll).set(String(id), d); return JSON.parse(JSON.stringify(d)); }
   async patch(coll, id, patch) { const cur = (await this.get(coll, id)) || {}; return this.put(coll, id, Object.assign(cur, patch)); }

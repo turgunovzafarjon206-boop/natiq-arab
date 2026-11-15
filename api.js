@@ -2,6 +2,9 @@
    Javoblar, dinor va jonlar faqat serverda hisoblanadi — ilova faqat koʻrsatadi. */
 const crypto = require('crypto');
 const G = require('./game');
+/* eski store.js bilan ham ishlasin (where boʻlmasa — roʻyxatdan filtrlanadi) */
+const qWhere = (st, coll, conds) => typeof st.where === 'function' ? st.where(coll, conds)
+  : st.list(coll, { fresh: true }).then(L => L.filter(r => conds.every(([f, op, v]) => op === 'in' ? v.map(String).includes(String(r[f])) : op === 'gt' ? String(r[f] == null ? '' : r[f]) > String(v) : String(r[f]) === String(v))));
 
 function verifyInitData(initData, token, maxAgeSec = 3 * 86400) {
   const p = new URLSearchParams(initData || ''); const hash = p.get('hash'); if (!hash || !token) return null;
@@ -93,7 +96,7 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
 
   /* admin amallari: dinor qoʻshish, jon, qaytarish (refund), qayta boshlash */
   async function applyOps(code, prog) {
-    const ops = (await store.where('ar_ops', [['code', 'eq', code], ['status', 'eq', 'pending']])).filter(o => o.status === 'pending').sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')));
+    const ops = (await qWhere(store, 'ar_ops', [['code', 'eq', code], ['status', 'eq', 'pending']])).filter(o => o.status === 'pending').sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')));
     if (!ops.length) return 0;
     const C = await cfg(); let p = prog || await getProg(code) || G.freshProg(code, { hearts: C.maxHearts });
     for (const o of ops) { const okk = G.applyOp(p, o, C); await store.put('ar_ops', o.id, Object.assign({}, o, { status: okk ? 'done' : 'error', doneAt: clock().toISOString() }));

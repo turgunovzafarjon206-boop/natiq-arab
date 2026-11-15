@@ -16,6 +16,9 @@ async function toM4a(buf, ext) {
   finally { fsp.rm(dir, { recursive: true, force: true }).catch(() => { }); }
 }
 const G = require('./game');
+/* eski store.js bilan ham ishlasin (where boʻlmasa — roʻyxatdan filtrlanadi) */
+const qWhere = (st, coll, conds) => typeof st.where === 'function' ? st.where(coll, conds)
+  : st.list(coll, { fresh: true }).then(L => L.filter(r => conds.every(([f, op, v]) => op === 'in' ? v.map(String).includes(String(r[f])) : op === 'gt' ? String(r[f] == null ? '' : r[f]) > String(v) : String(r[f]) === String(v))));
 
 const CYR = { А: 'A', В: 'B', Е: 'E', К: 'K', М: 'M', Н: 'H', О: 'O', Р: 'P', С: 'C', Т: 'T', Х: 'X', У: 'Y', Ж: 'J' };
 const normCode = s => String(s || '').toUpperCase().replace(/[А-ЯЁ]/g, ch => CYR[ch] || ch).replace(/[\s\-_.]/g, '');
@@ -83,7 +86,7 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     L.push('', `Tugmani bosing va ${m.kind === 'audio' ? 'oddiy ovozli xabar (yoki audio fayl)' : m.kind === 'video' ? 'videoni' : m.kind === 'image' ? 'rasmni' : 'faylni'} yuboring.`); return L.join('\n'); };
   async function processMediaNotify() {
     const since = Date.now() - 2 * 86400e3;
-    const M = (await store.where('ar_media', [['status', 'eq', 'wait']])).filter(m => m.status === 'wait' && !m.notified && Date.parse(m.at || 0) > since)
+    const M = (await qWhere(store, 'ar_media', [['status', 'eq', 'wait']])).filter(m => m.status === 'wait' && !m.notified && Date.parse(m.at || 0) > since)
       .sort((a, b) => (+a.id) - (+b.id)).slice(0, 20);
     if (!M.length) return 0; const A = await adminList(); if (!A.length) return 0; let sent = 0;
     for (const m of M) {
@@ -237,7 +240,7 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
 
   /* ommaviy xabarlar (saytdan: ar_msgs, status = pending) */
   async function processMsgs() {
-    const M = (await store.where('ar_msgs', [['status', 'eq', 'pending']])).filter(m => m.status === 'pending');   // faqat navbatdagilar — trafik tejaladi
+    const M = (await qWhere(store, 'ar_msgs', [['status', 'eq', 'pending']])).filter(m => m.status === 'pending');   // faqat navbatdagilar — trafik tejaladi
     if (!M.length) return 0;
     const C = await getCfg(); const codes = (await store.list('ar_codes', { fresh: true })).filter(c => c.status === 'active' && c.tgId);
     for (const m of M) {
