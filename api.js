@@ -2,6 +2,7 @@
    Javoblar, dinor va jonlar faqat serverda hisoblanadi — ilova faqat koʻrsatadi. */
 const crypto = require('crypto');
 const G = require('./game');
+const { createSocial } = require('./social');
 /* eski store.js bilan ham ishlasin (where boʻlmasa — roʻyxatdan filtrlanadi) */
 const qWhere = (st, coll, conds) => typeof st.where === 'function' ? st.where(coll, conds)
   : st.list(coll, { fresh: true }).then(L => L.filter(r => conds.every(([f, op, v]) => op === 'in' ? v.map(String).includes(String(r[f])) : op === 'gt' ? String(r[f] == null ? '' : r[f]) > String(v) : String(r[f]) === String(v))));
@@ -27,7 +28,7 @@ function signInitData(user, token, authDate = Math.floor(Date.now() / 1000)) {
 const digits = s => String(s || '').replace(/\D/g, '');
 class ApiError extends Error { constructor(status, msg, code) { super(msg); this.status = status; this.code = code; } }
 
-function createApi({ store, token, onOrder = async () => {}, onPay = async () => {}, onNotify = async () => {}, clock = () => new Date() }) {
+function createApi({ store, token, onOrder = async () => {}, onPay = async () => {}, onNotify = async () => {}, clock = () => new Date(), convert = null, botUser = null }) {
   const locks = new Map();
   const lock = (k, fn) => { const prev = locks.get(k) || Promise.resolve(); const p = prev.then(fn, fn); const tail = p.catch(() => {}); locks.set(k, tail);
     tail.then(() => { if (locks.get(k) === tail) locks.delete(k); }); return p; };
@@ -116,7 +117,9 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
       user: { name: p.name, code: c.id, pid: pidOf(c.id), phone: c.tgPhone || '', tester, noVideo: !!c.noVideo && !tester, noMarket: !!c.noMarket && !tester, group: g ? { name: g.name || '', days: g.days || [], time: g.time || '', dur: g.dur || '', meet: g.meet || '', note: g.note || '' } : null },
       cfg: { appName: C.appName, primary: C.primary, accent: C.accent, fruitPrice: C.fruitPrice, maxHearts: C.maxHearts, rw: C.rw, reviewQ: C.reviewQ, heartPer: C.heartPer,
         waterQ: C.waterQ, waterMin: C.waterMin, waterFruit: C.waterFruit, witherAfter: C.witherAfter, fruitStart: C.fruitStart, treeVideo: C.treeVideo || '', support: C.support || '', replayReward: !!C.replayReward },
-      prog: { dinor: p.dinor || 0, hearts: p.hearts || 0, days: p.days || 0, lastDay: p.lastDay || '', streak: p.streak || 0, lessons: p.lessons || 0, earned: p.earned || 0, sold: p.sold || 0, spent: p.spent || 0, lang: p.lang || 'uz', dark: !!p.dark },
+      prog: { dinor: p.dinor || 0, hearts: p.hearts || 0, days: p.days || 0, lastDay: p.lastDay || '', streak: p.streak || 0, lessons: p.lessons || 0, earned: p.earned || 0, sold: p.sold || 0, spent: p.spent || 0, lang: p.lang || 'uz', dark: !!p.dark,
+        vis: (p.vis || []).slice(-120), vfirst: p.vfirst || '', vstreak: G.vStreak(p, clock()), vbest: p.vbest || 0, medals: G.medalsOf(p), title: G.titleOf(p), unread: p.unread || 0 },
+      social: { on: C.socialOn !== false, followDinor: C.followDinor, likeEvery: C.likeEvery, likeDinor: C.likeDinor, refOn: C.refOn !== false, refDinor: C.refDinor, refNewDinor: C.refNewDinor },
       courses: cst, path, cur: G.current(p, L, open, CS), garden: G.garden(p, C), sess: p.sess ? G.sessPublic(p.sess) : null,
     };
   }
@@ -130,8 +133,9 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
   const plansOf = C => (Array.isArray(C.dinorPlans) ? C.dinorPlans : []).map(x => ({ dinor: Math.round(+x.dinor || 0), sum: Math.round(+x.sum || 0) })).filter(x => x.dinor > 0 && x.sum > 0);
   const H = {
     async me({ c, user }) {
-      return lock(c.id, async () => { const p = await loadProg(c, user); await applyOps(c.id, p); await saveProg(p);
-        const [C, L, groups, CR] = await Promise.all([cfg(), letters(), store.list('ar_groups', { ttl: 30000 }), courses()]); return meView(c, p, C, L, groups, CR.list); });
+      return lock(c.id, async () => { const p = await loadProg(c, user); await applyOps(c.id, p); const medal = G.visit(p, clock()); await saveProg(p);
+        const [C, L, groups, CR] = await Promise.all([cfg(), letters(), store.list('ar_groups', { ttl: 30000 }), courses()]); const v = meView(c, p, C, L, groups, CR.list);
+        if (medal) v.medal = medal; v.contest = await contestBanner(); v.bot = botUser ? botUser() : ''; return v; });
     },
     async lesson({ c, user }, b) {
       return lock(c.id, async () => { const p = await loadProg(c, user); const C = await cfg(); const L = await letters();
@@ -146,8 +150,11 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
         return { sess: G.sessPublic(r.sess), hearts: p.hearts }; });
     },
     async step({ c, user }, b) {
-      return lock(c.id, async () => { const p = await loadProg(c, user); const C = await cfg();
+      return lock(c.id, async () => { const p = await loadProg(c, user); const C = await cfg(); const s0 = p.sess;
+        if (s0 && s0.mode === 'contest' && s0.until && clock().getTime() > s0.until + (b.timeup ? -3000 : 5000)) {   // bellashuv vaqti tugadi
+          const end = G.finish(p, C, clock()); end.late = true; await SOC.contestStep(p, s0, { end }); await saveProg(p); return { i: s0.i, end, hearts: p.hearts, gain: 0, dinor: p.dinor }; }
         const r = G.step(p, b, C, clock()); if (r.error && r.code !== 'sync') throw new ApiError(400, r.error, r.code);
+        if (s0 && s0.mode === 'contest' && !r.error) await SOC.contestStep(p, s0, r);
         await saveProg(p); if (r.end) r.garden = G.garden(p, C); r.dinor = p.dinor; return r; });
     },
     async quit({ c, user }) {
@@ -168,15 +175,17 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
       const items = O.sort((a, b2) => String(b2.at).localeCompare(String(a.at))).slice(0, 30).map(o => ({ name: o.productName || '', img: (PR.get(o.productId) || {}).img || '', at: String(o.at || '').slice(0, 10) }));
       const trees = t.trees || [];
       return { pid: pidOf(t.code), name: t.name || 'Oʻquvchi', me: isMe, dinor: +t.dinor || 0, lessons: t.lessons || 0, trees: trees.length, fruit: trees.reduce((a, x) => a + (x.fruit || 0), 0), sold: t.sold || 0,
-        days: t.days || 0, streak: t.streak || 0, items, followers: fl.length, following: followingOf(P, t).length, iFollow: (me.follows || []).includes(t.code) };
+        days: t.days || 0, streak: t.streak || 0, items, followers: fl.length, following: followingOf(P, t).length, iFollow: (me.follows || []).includes(t.code),
+        title: G.titleOf(t), medals: G.medalsOf(t), vstreak: G.vStreak(t, clock()), vbest: t.vbest || 0, posts: (await SOC.posts()) ? [...(await SOC.posts()).values()].filter(x => x.kind === 'post' && x.code === t.code && !x.hidden).length : 0 };
     },
     async follow({ c, user }, b) {
       return lock(c.id, async () => { const P = await allProgs(); const t = byPid(P, b.pid); if (!t || t.hideRank) throw new ApiError(404, 'Profil topilmadi');
         if (t.code === c.id) throw new ApiError(400, 'Oʻzingizga obuna boʻlib boʻlmaydi');
         const p = await loadProg(c, user); const F = new Set(p.follows || []);
         if (b.on === false) F.delete(t.code); else { if (F.size >= 500) throw new ApiError(400, 'Obunalar soni chegarasiga yetdingiz'); F.add(t.code); }
-        p.follows = [...F]; await saveProg(p);
-        return { iFollow: F.has(t.code), followers: followersOf(await allProgs(), t.code).length }; });
+        const fresh = b.on !== false && !(p.follows || []).includes(t.code); p.follows = [...F]; await saveProg(p);
+        return { iFollow: F.has(t.code), followers: followersOf(await allProgs(), t.code).length, fresh, t: t.code, name: p.name }; })
+        .then(async r => { if (r.fresh) await followed(r.t, c.id, r.name); delete r.fresh; delete r.t; delete r.name; return r; });
     },
     async follows({ c }, b) {
       const P = await allProgs(); const t = b.pid ? byPid(P, b.pid) : P.find(x => x.code === c.id); if (!t) throw new ApiError(404, 'Profil topilmadi');
@@ -237,6 +246,21 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
     },
   };
 
+  /* obuna: obuna boʻlinganga — bildirishnoma (ilova + bot) va admin belgilagan dinor (bir odamdan bir marta) */
+  async function followed(tcode, fcode, fname) {
+    const C = await cfg(); let pay = 0;
+    await lock(tcode, async () => { const t = await getProg(tcode); if (!t) return; const got = new Set(t.fby || []);
+      if (!got.has(fcode)) { got.add(fcode); t.fby = [...got].slice(-5000); if (C.followDinor > 0) pay = C.followDinor; }
+      t.notes = [{ t: 'follow', pid: pidOf(fcode), name: fname, at: clock().toISOString(), n: pay }, ...(t.notes || [])].slice(0, 60); t.unread = Math.min(99, (t.unread || 0) + 1); await saveProg(t, true); });
+    await store.put('ar_ops', G.uid(), { code: tcode, type: pay ? 'dinor' : 'msg', n: pay, status: 'pending', at: clock().toISOString(), by: 'system', byName: 'Ilova', note: 'Yangi obunachi',
+      msg: `👤 ${fname} sizga obuna boʻldi!${pay ? ` +${pay} dinor 🎉` : ''}` });
+  }
+  /* yaqin bellashuv (bosh sahifada banner) */
+  async function contestBanner() { try { const L = (await store.list('ar_contests', { ttl: 30000 })).filter(x => x.on !== false && G.contestState(x, clock().getTime()) !== 'done').sort((a, z) => String(a.at).localeCompare(String(z.at)));
+    const x = L[0]; return x ? { id: x.id, title: x.title || 'Bellashuv', at: x.at, dur: +x.dur || 15, st: G.contestState(x, clock().getTime()) } : null; } catch (e) { return null; } }
+  const SOC = createSocial({ store, G, cfg, lock, loadProg, getProg, saveProg, allProgs, pidOf, byPid, clock, ApiError, convert, botUser, qWhere, letters });
+  Object.assign(H, SOC.H);
+
   const hits = new Map();
   async function handle(name, body) {
     try {
@@ -250,7 +274,7 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
       console.error('api', name, e); return { status: 500, body: { error: 'Server xatosi: ' + e.message } };
     }
   }
-  return { handle, applyOps, lock, cfg, auth, flush, drop };
+  return { handle, applyOps, lock, cfg, auth, flush, drop, social: SOC, pidOf };
 }
 
 module.exports = { createApi, verifyInitData, signInitData, ApiError };

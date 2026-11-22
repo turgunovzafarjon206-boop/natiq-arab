@@ -18,6 +18,12 @@ const DEF_CFG = {
   mediaAdmins: '',
   remindOn: true, remindDays: 2, remindRepeat: 0, remindMascot: 'learn',
   remindText: '{ism}, seni sogʻindim! 🦉\n{kun} kundan beri darsga kirmading. Bugun atigi 5 daqiqa ajrat — jonlaringni toʻldir, dinor yigʻ va bogʻingni sugʻor! 🌳',
+  /* ijtimoiy: obuna, post, like, hamjamiyat, reels */
+  socialOn: true, followDinor: 0, likeEvery: 10, likeDinor: 0, postsPerDay: 10, commPerDay: 60, reelsUser: 30,
+  /* referal: havola → tanishtiruv video → toʻlov → admin tasdiqlaydi → ID avtomatik ochiladi */
+  refOn: true, refDinor: 0, refNewDinor: 0, refVideo: '', refSum: 0, refPayUrl: '', refCourses: [],
+  refText: 'Assalomu alaykum! 👋\n«Natiq Arabic» — arab tilini oʻyin orqali, qadamma-qadam oʻrganish ilovasi: video darslar, talaffuz, testlar, dinor va sovgʻalar.\n\nQoʻshilish uchun pastdagi tugmani bosing 👇',
+  refPayText: 'Obuna uchun toʻlovni quyidagi kartaga qiling va chek rasmini shu yerga yuboring.',
 };
 const MASCOTS = ['read', 'thumbs', 'cheer', 'bravo', 'think', 'goodjob', 'cool', 'party', 'love', 'sleep', 'write', 'learn', 'peek', 'walk', 'stars', 'trophy'];
 const PARTS = [
@@ -29,7 +35,9 @@ const STAGES = ['', 'Nihol ekildi', 'Unib chiqdi', 'Nihol boʻldi', 'Daraxt boʻ
 
 const sid = () => Date.now().toString(36) + crypto.randomBytes(5).toString('hex');
 const cfgOf = c => { const x = Object.assign({}, DEF_CFG, c || {}); x.rw = Object.assign({}, DEF_CFG.rw, (c && c.rw) || {});
-  ['maxHearts', 'reviewQ', 'heartPer', 'waterQ', 'waterMin', 'waterPerDay', 'waterFruit', 'fruitStart', 'witherAfter', 'fruitPrice', 'finalMax'].forEach(k => { x[k] = Math.max(0, +x[k] || 0); });
+  ['maxHearts', 'reviewQ', 'heartPer', 'waterQ', 'waterMin', 'waterPerDay', 'waterFruit', 'fruitStart', 'witherAfter', 'fruitPrice', 'finalMax',
+   'followDinor', 'likeEvery', 'likeDinor', 'postsPerDay', 'commPerDay', 'reelsUser', 'refDinor', 'refNewDinor', 'refSum'].forEach(k => { x[k] = Math.max(0, +x[k] || 0); });
+  x.likeEvery = x.likeEvery || 1; x.reelsUser = Math.min(100, x.reelsUser); if (!Array.isArray(x.refCourses)) x.refCourses = [];
   x.maxHearts = x.maxHearts || 5; x.heartPer = x.heartPer || 2; x.reviewQ = x.reviewQ || 10; x.waterQ = x.waterQ || 5; x.witherAfter = x.witherAfter || 4;
   return x; };
 
@@ -151,6 +159,45 @@ function markDay(prog, now = new Date()) {
   prog.days = (prog.days || 0) + 1; prog.lastDay = d; return true;
 }
 
+/* ---------- ilovaga kirgan kunlar (kalendar) va unvonlar ---------- */
+const MEDALS = [
+  { d: 3, n: '3 kun', t: 'Boshlovchi', ic: '🥉' }, { d: 7, n: '1 hafta', t: 'Haftalik qahramon', ic: '🥈' }, { d: 15, n: '15 kun', t: 'Barqaror', ic: '🥇' },
+  { d: 30, n: '30 kun', t: 'Oy yulduzi', ic: '🌟' }, { d: 35, n: '5 hafta', t: 'Sabr ustasi', ic: '🏅' }, { d: 70, n: '10 hafta', t: 'Natiq afsonasi', ic: '👑' }];
+/* bugun kirdi: ketma-ket kunlar (streak), eng uzun seriya; yangi unvon olingan boʻlsa — qaytaradi */
+function visit(prog, now = new Date()) {
+  const d = tzDate(now); prog.vis = Array.isArray(prog.vis) ? prog.vis : [];
+  if (prog.vlast === d) return null;
+  const before = medalsOf(prog).filter(m => m.got).length;
+  prog.vstreak = prog.vlast && dayDiff(prog.vlast, d) === 1 ? (prog.vstreak || 0) + 1 : 1;
+  prog.vlast = d; prog.vbest = Math.max(prog.vbest || 0, prog.vstreak); if (!prog.vfirst) prog.vfirst = d;
+  if (prog.vis[prog.vis.length - 1] !== d) prog.vis.push(d); if (prog.vis.length > 400) prog.vis = prog.vis.slice(-400);
+  const M = medalsOf(prog); return M.filter(m => m.got).length > before ? M.filter(m => m.got).pop() : null;
+}
+const vStreak = (prog, now = new Date()) => prog.vlast && dayDiff(prog.vlast, tzDate(now)) <= 1 ? (prog.vstreak || 0) : 0;
+function medalsOf(prog) { const b = Math.max(prog.vbest || 0, prog.vstreak || 0); return MEDALS.map(m => Object.assign({ got: b >= m.d }, m)); }
+const titleOf = prog => { const g = medalsOf(prog).filter(m => m.got).pop(); return g ? g.ic + ' ' + g.t : ''; };
+
+/* ---------- bellashuv: hamma uchun bir xil savollar (bellashuv ID’si boʻyicha tasodif) ---------- */
+function seedRnd(s) { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return () => { h = (h + 0x6D2B79F5) | 0; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function contestPool(letters, courses, rnd) {
+  const S = sorted(letters).filter(l => !courses || !courses.length || courses.includes(courseOf(l))); const W = allWords(S); const pool = [];
+  for (const L of S) { for (let p = 1; p <= 5; p++) pool.push(...partTests(L, p));
+    pool.push(...cardQs((((L.parts || {}).cards || {}).cards || []).filter(c => c && c.ar).slice(0, CARD_MAX), L.id, rnd));
+    pool.push(...wordQs(((L.parts || {}).vocab || {}).words, L.id, W, rnd)); }
+  const seen = new Set(); return pool.filter(q => validQ(q) && q.type !== 'speak' && !seen.has(q.id) && seen.add(q.id));
+}
+const contestState = (ct, now = Date.now()) => { const a = Date.parse(ct.at || 0), b = a + Math.max(1, +ct.dur || 15) * 60e3;
+  return ct.status === 'done' || now >= b ? 'done' : now >= a ? 'live' : 'soon'; };
+function startContest(prog, letters, ct, now = Date.now()) {
+  const st = contestState(ct, now); if (st === 'soon') return { error: 'Bellashuv hali boshlanmadi' }; if (st === 'done') return { error: 'Bellashuv tugagan' };
+  const rnd = seedRnd(ct.id); const pool = shuffle(contestPool(letters, ct.courses, rnd), rnd); const n = Math.min(Math.max(3, +ct.qn || 15), pool.length);
+  if (!n) return { error: 'Bellashuv savollari hali tayyor emas' };
+  const s = { sid: sid(), mode: 'contest', cid: ct.id, lid: '', part: 0, title: ct.title || 'Bellashuv', items: pool.slice(0, n).map(q => prepQ(q, rnd)), i: 0, gain: 0, ok: 0, bad: 0, pay: false, at: now,
+    until: Date.parse(ct.at) + Math.max(1, +ct.dur || 15) * 60e3 };
+  prog.sess = s; return { sess: s };
+}
+
 /* takrorlash savollari: oʻtilgan joygacha (bajarilgan qismlar + hozirgi ochiq qism) */
 function reviewPool(prog, letters, cfg, rnd = Math.random, open) {
   const pool = []; const W = allWords(letters); const S = sorted(letters);
@@ -172,7 +219,7 @@ function pub(it) { const x = Object.assign({}, it); delete x.k; delete x.a; dele
 const prepQ = (q, rnd) => Q.prep(q, rnd);   // toʻgʻri javob (k) faqat serverda qoladi
 function sessPublic(s) {
   return { sid: s.sid, mode: s.mode, lid: s.lid, part: s.part, title: s.title, i: s.i, n: s.items.length, gain: s.gain, ok: s.ok, replay: !!s.replay, pay: !!s.pay,
-    items: s.items.map(pub), tree: s.tree || null };
+    items: s.items.map(pub), tree: s.tree || null, cid: s.cid || '', until: s.until || 0 };
 }
 
 function startLesson(prog, letters, lid, part, cfg, opts = {}) {
@@ -308,4 +355,4 @@ function applyOp(prog, op, cfg) {
 }
 
 module.exports = { Q, CARD_MAX, DEF_COURSE, courseOf, courseList, courseAllowed, courseStates, MASCOTS, DEF_CFG, PARTS, STAGES, cfgOf, tzDate, shuffle, sorted, freshProg, normQ, wordQs, cardQs, partItems, partTests, hasContent, unlocked, current,
-  markDay, reviewPool, startLesson, startReview, step, finish, grow, isDry, waterState, water, garden, sell, rating, applyOp, sessPublic, uid: sid };
+  markDay, visit, vStreak, medalsOf, titleOf, MEDALS, seedRnd, contestPool, contestState, startContest, reviewPool, startLesson, startReview, step, finish, grow, isDry, waterState, water, garden, sell, rating, applyOp, sessPublic, uid: sid };

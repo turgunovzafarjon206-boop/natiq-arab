@@ -42,7 +42,22 @@ function createMediaCache({ dir, download, convert }) {
   return { file, dir };
 }
 
-function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), info = () => ({}), store, big, media = null }) {
+/* ijtimoiy media (rasm, ovoz: arab/soc/…, arab/reel/…) — bir marta Supabase’dan olinadi, keyin server diskidan beriladi */
+function createUserCache({ dir, store }) {
+  const pend = new Map();
+  async function file(rel) {
+    const p = path.join(dir, rel.replace(/\//g, '_'));
+    try { if (fs.statSync(p).size > 0) return p; } catch (e) { }
+    if (pend.has(p)) return pend.get(p);
+    const pr = (async () => { const buf = await store.download('arab', rel); if (!buf || !buf.length) return null;
+      fs.mkdirSync(dir, { recursive: true }); const tmp = p + '.' + process.pid + '.tmp'; fs.writeFileSync(tmp, buf); fs.renameSync(tmp, p); return p; })().finally(() => pend.delete(p));
+    pend.set(p, pr); return pr;
+  }
+  return { file };
+}
+const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', m4a: 'audio/mp4', mp3: 'audio/mpeg', ogg: 'audio/ogg', webm: 'audio/webm', wav: 'audio/wav', aac: 'audio/aac', mp4: 'video/mp4', mov: 'video/quicktime' };
+
+function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), info = () => ({}), store, big, media = null, ucache = null }) {
   return http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x'); const p = url.pathname.replace(/\/+$/, '') || '/';
     const send = (st, body, type = 'application/json; charset=utf-8', extra = {}) => { res.writeHead(st, Object.assign({ 'Content-Type': type, 'X-Content-Type-Options': 'nosniff' }, extra)); res.end(body); };
@@ -77,12 +92,24 @@ function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), 
         catch (e) { console.error('media oqim', e.message); }
         return res.end();
       }
+      const um = /^\/u\/((?:soc|reel)\/[A-Za-z0-9._-]+)$/.exec(p);
+      if (req.method === 'GET' && um && ucache) {
+        let f = null; try { f = await ucache.file(um[1]); } catch (e) { console.error('u', um[1], e.message); }
+        if (!f) return send(404, JSON.stringify({ error: 'Topilmadi' }));
+        const size = fs.statSync(f).size; const mime = MIME[(um[1].split('.').pop() || '').toLowerCase()] || 'application/octet-stream';
+        const rg = /bytes=(\d*)-(\d*)/.exec(req.headers.range || ''); let start = 0, end = size - 1, st = 200;
+        if (rg && size) { if (rg[1] === '' && rg[2]) { start = Math.max(0, size - +rg[2]); } else { start = +rg[1] || 0; if (rg[2]) end = Math.min(+rg[2], size - 1); } st = 206; }
+        if (start > end) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); return res.end(); }
+        const head = { 'Content-Type': mime, 'Accept-Ranges': 'bytes', 'Content-Length': end - start + 1, 'Cache-Control': 'public, max-age=2592000, immutable', 'X-Content-Type-Options': 'nosniff' };
+        if (st === 206) head['Content-Range'] = `bytes ${start}-${end}/${size}`;
+        res.writeHead(st, head); return fs.createReadStream(f, { start, end }).pipe(res);
+      }
       if (req.method === 'GET' && m && MASCOTS.includes(m[1])) { const f = assetPath(`mascot-${m[1]}.${m[2]}`); if (f) return send(200, fs.readFileSync(f), { webp: 'image/webp', jpg: 'image/jpeg', png: 'image/png' }[m[2]], { 'Cache-Control': 'public, max-age=604800' }); }
       /* «/» ham ilovani ochadi: BotFather’da domenning oʻzi yozilgan boʻlsa ham («Ochish» tugmasi) */
       if (req.method === 'GET' && (p === '/app' || p === '/')) return send(200, appHtml(), 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache' });
       if (req.method === 'POST' && p.startsWith('/api/')) {
         let body = ''; let big = false;
-        const lim = p === '/api/pay' ? 5 * 1048576 : 65536;   // chek rasmi uchun kattaroq
+        const lim = ['/api/pay', '/api/comm', '/api/post'].includes(p) ? 8 * 1048576 : 65536;   // chek rasmi, post rasmi va ovozli xabar uchun kattaroq
         for await (const ch of req) { body += ch; if (body.length > lim) { big = true; break; } }
         if (big) return send(413, JSON.stringify({ error: 'Soʻrov juda katta' }));
         let j = {}; try { j = JSON.parse(body || '{}'); } catch (e) { return send(400, JSON.stringify({ error: 'JSON xato' })); }
@@ -104,7 +131,8 @@ async function main() {
   if (!appUrl) console.warn('⚠️ APP_URL yoʻq: Railway → Settings → Networking → Generate Domain bosing');
 
   let A;
-  const api = createApi({ store, token, onOrder: o => A && A.notifyOrder(o), onPay: x => A && A.notifyPay(x), onNotify: (code, t) => A && A.notifyCode(code, t) });
+  const api = createApi({ store, token, onOrder: o => A && A.notifyOrder(o), onPay: x => A && A.notifyPay(x), onNotify: (code, t) => A && A.notifyCode(code, t),
+    convert: toM4a, botUser: () => (A && A.bot.botInfo && A.bot.botInfo.username) || '' });
   const big = createBig({ apiId: env.TG_API_ID, apiHash: env.TG_API_HASH, token });
   if (big) big.connect().then(() => console.log('MTProto ulandi — katta fayllar yuklanadi')).catch(e => console.error('MTProto:', e.message));
   const mediaDir = env.MEDIA_DIR || path.join(require('os').tmpdir(), 'natiq-media');
@@ -115,7 +143,8 @@ async function main() {
   const media = createMediaCache({ dir: mediaDir, convert: toM4a, download: async fileId => {
     const f = await A.bot.api.getFile(fileId); const r = await fetch(`https://api.telegram.org/file/bot${token}/${f.file_path}`);
     if (!r.ok) throw new Error('Telegram fayli olinmadi (HTTP ' + r.status + ')'); return Buffer.from(await r.arrayBuffer()); } });
-  const server = createServer({ api, store, big, media, info: () => ({ bot: bot.botInfo && bot.botInfo.username, appUrl, started }) });
+  const ucache = createUserCache({ dir: path.join(mediaDir, 'u'), store });
+  const server = createServer({ api, store, big, media, ucache, info: () => ({ bot: bot.botInfo && bot.botInfo.username, appUrl, started }) });
   const port = +env.PORT || 3000; server.listen(port, () => console.log('HTTP :' + port, appUrl || ''));
 
   try { await bot.api.setMyCommands([{ command: 'start', description: 'Boshlash' }, { command: 'app', description: 'Ilovani ochish' }]); } catch (e) { }
@@ -125,6 +154,8 @@ async function main() {
   const tick = async () => { if (busy) return; busy = true;
     try { await A.processMsgs(); } catch (e) { console.error('msgs', e.message); }
     try { await A.processMediaNotify(); } catch (e) { console.error('media xabar', e.message); }
+    try { await api.social.tick(); } catch (e) { console.error('ijtimoiy', e.message); }
+    try { await A.processJoins(); } catch (e) { console.error('obuna (referal)', e.message); }
     try { const ops = (await qWhere(store, 'ar_ops', [['status', 'eq', 'pending']])).filter(o => o.status === 'pending'); const codes = [...new Set(ops.map(o => o.code))];
       for (const c of codes) await api.lock(c, () => api.applyOps(c)); } catch (e) { console.error('ops', e.message); }
     busy = false; };
@@ -141,4 +172,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch(e => { console.error(e); process.exit(1); });
-module.exports = { createServer, createMediaCache, MASCOTS, assetPath };
+module.exports = { createServer, createMediaCache, createUserCache, MASCOTS, assetPath };

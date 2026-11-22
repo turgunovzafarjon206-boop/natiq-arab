@@ -158,8 +158,10 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
   bot.command('start', async ctx => {
     if (ctx.chat.type !== 'private') return;
     const id = ctx.from.id; const { tg, c } = await linked(id);
+    const pl = String(ctx.match || '').trim(); const P = parseStart(pl);
     if (await isAdmin(id)) await ctx.reply('🛠 Admin: darslar uchun video va ovozlarni «📤 Media yuklash» tugmasi orqali yuborasiz.', { reply_markup: ADMIN_KB });
-    if (c && c.status === 'active') return welcome(ctx, c);
+    if (c && c.status === 'active') { if (P.post) return sendPost(ctx, P.post, c); return welcome(ctx, c); }
+    if (P.ref && (await getCfg()).refOn !== false && !(c && c.status === 'blocked')) return refIntro(ctx, tg, P);
     if (c && c.status === 'blocked') return ctx.reply('⛔ ID kodingiz bloklangan. Administrator bilan bogʻlaning.');
     const base = Object.assign({}, tg || {}, { tgId: id, name: tgName(ctx.from), username: ctx.from.username || '', at: now() });
     base.step = base.phone ? 'code' : 'phone'; await store.put('ar_tg', id, base);
@@ -175,9 +177,10 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     const ct = ctx.message.contact;
     if (ct.user_id && ct.user_id !== ctx.from.id) return ctx.reply('Iltimos, oʻzingizning raqamingizni yuboring — pastdagi tugma orqali.');
     const id = ctx.from.id; const tg = (await store.get('ar_tg', id)) || {};
-    const { c } = await linked(id);
-    await store.put('ar_tg', id, Object.assign(tg, { tgId: id, phone: '+' + digits(ct.phone_number), name: tgName(ctx.from), username: ctx.from.username || '', step: c && c.status === 'active' ? 'done' : 'code', at: now() }));
+    const { c } = await linked(id); const refStep = tg.step === 'ref_phone';
+    await store.put('ar_tg', id, Object.assign(tg, { tgId: id, phone: '+' + digits(ct.phone_number), name: tgName(ctx.from), username: ctx.from.username || '', step: c && c.status === 'active' ? 'done' : refStep ? 'ref_pay' : 'code', at: now() }));
     if (c && c.status === 'active') return welcome(ctx, c);
+    if (refStep) return refPay(ctx);
     return askCode(ctx);
   });
 
@@ -190,6 +193,7 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     if (adm && !(tg && tg.phone)) tg = Object.assign(tg || {}, { tgId: id, phone: tg && tg.phone || '' });
     if (!tg || (!tg.phone && !adm)) return askPhone(ctx);
     const code = normCode(text); const cur = (await linked(id)).c;
+    if (!CODE_RE.test(code) && !(cur && cur.status === 'active') && ['ref_pay', 'ref_wait'].includes(tg.step)) return ctx.reply(tg.step === 'ref_wait' ? '⏳ Chekingiz tekshirilmoqda — admin tasdiqlagach, ilova avtomatik ochiladi.' : '🧾 Toʻlov chekini (rasm yoki skrinshot) shu yerga yuboring.\nAgar sizda ID kod boʻlsa — uni yozing.');
     if (!CODE_RE.test(code)) {
       if (cur && cur.status === 'active') return welcome(ctx, cur);
       return ctx.reply('ID kod 6 ta belgidan iborat (lotin harflari va raqamlar). Qaytadan yozing:');
@@ -218,6 +222,113 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     await ctx.reply('🎉 ID qabul qilindi! Hisobingiz faollashtirildi.');
     return welcome(ctx, c);
   });
+
+  /* ---------- referal: havola → tanishtiruv video → «Qoʻshilish» → telefon → toʻlov → chek → admin tasdiqlaydi → ID avtomatik ---------- */
+  const pidOf = code => require('crypto').createHmac('sha256', String(token || 'natiq')).update('pid:' + code).digest('hex').slice(0, 12);
+  function parseStart(s) {   // r_<pid> — shaxsiy, a_<nom> — admin havolasi, p<post>_<pid> — ulashilgan post
+    let m = /^r_([a-f0-9]{12})$/.exec(s); if (m) return { ref: { t: 'u', pid: m[1] } };
+    m = /^a_([A-Za-z0-9-]{2,40})$/.exec(s); if (m) return { ref: { t: 'a', slug: m[1].toLowerCase() } };
+    m = /^p([A-Za-z0-9]{6,40})_([a-f0-9]{12})$/.exec(s); if (m) return { post: m[1], ref: { t: 'u', pid: m[2] } };
+    return {};
+  }
+  const JOIN_KB = { inline_keyboard: [[{ text: '➕ Qoʻshilish', callback_data: 'rj' }], [{ text: '🔑 Menda ID kod bor', callback_data: 'rid' }]] };
+  async function refIntro(ctx, tg, P) {
+    const C = await getCfg(); const id = ctx.from.id;
+    if (P.ref.t === 'a') { const r = await store.get('ar_refs', P.ref.slug); if (r) await store.put('ar_refs', r.id, Object.assign(r, { clicks: (+r.clicks || 0) + 1 })); }
+    await store.put('ar_tg', id, Object.assign({}, tg || {}, { tgId: id, name: tgName(ctx.from), username: ctx.from.username || '', ref: P.ref, refAt: now(), step: (tg && tg.step === 'ref_wait') ? 'ref_wait' : 'ref', at: now() }));
+    const text = String(C.refText || G.DEF_CFG.refText).slice(0, 1024); const v = String(C.refVideo || '').trim();
+    let vid = v; const mt = /^tg:(\d+)$/.exec(v); if (mt) { const md = await store.get('ar_media', mt[1]); vid = md && (md.fileId || md.url) || ''; }
+    if (vid) { try { return await ctx.replyWithVideo(vid, { caption: text, reply_markup: JOIN_KB, supports_streaming: true }); } catch (e) { console.error('ref video', e.message); } }
+    const pic = C.welcomeImg || mascot('walk');
+    if (pic) { try { const m = await ctx.replyWithPhoto(pic, { caption: text, reply_markup: JOIN_KB }); if (!C.welcomeImg) remember('walk', m); return m; } catch (e) { } }
+    return ctx.reply(text, { reply_markup: JOIN_KB });
+  }
+  async function refPay(ctx) {
+    const C = await getCfg(); const sum = +C.refSum || 0;
+    const t = `💳 <b>Obuna toʻlovi</b>${sum ? `: ${String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} soʻm` : ''}\n\n${esc(C.refPayText || G.DEF_CFG.refPayText)}${C.payCard ? `\n\n💳 Karta: <code>${esc(C.payCard)}</code>${C.payName ? '\n👤 ' + esc(C.payName) : ''}` : ''}\n\n🧾 Toʻlovdan soʻng <b>chek rasmini</b> (skrinshot) shu yerga yuboring.`;
+    const rm = /^https:\/\//.test(String(C.refPayUrl || '')) ? { inline_keyboard: [[{ text: '💳 Toʻlov qilish', url: C.refPayUrl }]] } : { remove_keyboard: true };
+    return ctx.reply(t, { parse_mode: 'HTML', reply_markup: rm });
+  }
+  bot.callbackQuery('rj', async ctx => { try { await ctx.answerCallbackQuery(); } catch (e) { } const id = ctx.from.id; const tg = (await store.get('ar_tg', id)) || { tgId: id };
+    if ((await linked(id)).c) return welcome(ctx, (await linked(id)).c);
+    if (tg.step === 'ref_wait') return ctx.reply('⏳ Chekingiz tekshirilmoqda — admin tasdiqlagach, ilova avtomatik ochiladi.');
+    if (!tg.phone) { await store.put('ar_tg', id, Object.assign(tg, { step: 'ref_phone', at: now() }));
+      return ctx.reply('📱 Avval telefon raqamingizni yuboring — pastdagi tugmani bosing.', { reply_markup: { keyboard: [[{ text: '📱 Telefon raqamni yuborish', request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } }); }
+    await store.put('ar_tg', id, Object.assign(tg, { step: 'ref_pay', at: now() })); return refPay(ctx); });
+  bot.callbackQuery('rid', async ctx => { try { await ctx.answerCallbackQuery(); } catch (e) { } const id = ctx.from.id; const tg = (await store.get('ar_tg', id)) || { tgId: id };
+    await store.put('ar_tg', id, Object.assign(tg, { step: tg.phone ? 'code' : 'phone', at: now() })); return tg.phone ? askCode(ctx) : askPhone(ctx); });
+  /* chek rasmi (referal toʻlovi) */
+  bot.on(['message:photo', 'message:document'], async (ctx, next) => {
+    if (ctx.chat.type !== 'private') return next(); const id = ctx.from.id; const tg = await store.get('ar_tg', id);
+    if (!tg || !['ref_pay', 'ref_wait', 'ref'].includes(tg.step)) return next();
+    const m = ctx.message; const f = m.photo ? m.photo[m.photo.length - 1] : (m.document && /^image\//.test(m.document.mime_type || '') ? m.document : null);
+    if (!f) return ctx.reply('Chekni rasm (skrinshot) koʻrinishida yuboring.');
+    if (!tg.phone) { await store.put('ar_tg', id, Object.assign(tg, { step: 'ref_phone' })); return ctx.reply('📱 Avval telefon raqamingizni yuboring.', { reply_markup: { keyboard: [[{ text: '📱 Telefon raqamni yuborish', request_contact: true }]], resize_keyboard: true, one_time_keyboard: true } }); }
+    const open = (await qWhere(store, 'ar_pays', [['kind', 'eq', 'join'], ['tgId', 'eq', id]])).filter(x => x.status === 'new');
+    if (open.length >= 2) return ctx.reply('⏳ Oldingi chekingiz tekshirilmoqda — admin tasdiqlashini kuting.');
+    try {
+      const file = await bot.api.getFile(f.file_id); const r = await doFetch(`https://api.telegram.org/file/bot${token}/${file.file_path}`); if (!r.ok) throw new Error('HTTP ' + r.status);
+      const buf = Buffer.from(await r.arrayBuffer()); const C = await getCfg(); const pid = G.uid();
+      const path = `pay/join-${pid}${require('crypto').randomBytes(4).toString('hex')}.jpg`; await store.upload('arab', path, buf, 'image/jpeg');
+      const img = store.publicUrl ? store.publicUrl('arab', path) : path;
+      const x = { kind: 'join', tgId: id, name: tg.name || tgName(ctx.from), username: ctx.from.username || '', phone: tg.phone || '', ref: tg.ref || null, sum: +C.refSum || 0, dinor: 0, img, status: 'new', at: now() };
+      await store.put('ar_pays', pid, x); await store.put('ar_tg', id, Object.assign(tg, { step: 'ref_wait', at: now() }));
+      await ctx.reply('✅ Chek qabul qilindi! Admin tekshirib tasdiqlagach, ilova avtomatik ochiladi — ID kod kiritish shart emas. ⏳');
+      const chats = String(C.notifyChats || '').split(/[\s,;]+/).filter(Boolean);
+      const t = `🆕 <b>Yangi obuna (referal)</b>${x.sum ? `\n${String(x.sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} soʻm` : ''}\n👤 ${esc(x.name)}${x.username ? ' @' + esc(x.username) : ''}\n📞 ${esc(x.phone)}\nnatiq.uz → Mini ilova → «Toʻlovlar»da tasdiqlang.`;
+      for (const ch of chats) { try { await bot.api.sendPhoto(ch, f.file_id, { caption: t, parse_mode: 'HTML' }); } catch (e) { console.error('notify join', ch, e.message); } }
+    } catch (e) { console.error('join chek', e.message); return ctx.reply('❌ Chekni saqlab boʻlmadi, qaytadan yuboring.'); }
+  });
+  /* ulashilgan post: ilovada ochish tugmasi bilan */
+  async function sendPost(ctx, postId, c) {
+    const p = await store.get('ar_posts', postId); const C = await getCfg();
+    if (!p || p.hidden) return welcome(ctx, c);
+    const url = appUrl ? appUrl + (appUrl.includes('?') ? '&' : '?') + 'post=' + encodeURIComponent(p.id) : '';
+    const rm = url ? { inline_keyboard: [[{ text: '📲 Ilovada ochish', web_app: { url } }]] } : undefined;
+    const cap = `${p.admin ? '📢' : '👤 ' + esc(p.name || '')}\n${esc(String(p.text || '').slice(0, 900))}`.trim();
+    try { if (p.img && /^https:/.test(p.img)) return await ctx.replyWithPhoto(p.img, { caption: cap, parse_mode: 'HTML', reply_markup: rm }); } catch (e) { }
+    return ctx.reply(cap || '📌 Post', { parse_mode: 'HTML', reply_markup: rm });
+  }
+  /* admin tasdiqlagan obunalar: ID avtomatik yaratiladi, Telegram’ga biriktiriladi, referal sovgʻalari beriladi */
+  const newCode = async () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; for (let i = 0; i < 30; i++) { let s = ''; for (let k = 0; k < 6; k++) s += A[Math.floor(Math.random() * A.length)]; if (!(await store.get('ar_codes', s))) return s; } throw new Error('ID yaratilmadi'); };
+  async function welcomeTo(chatId, c) {
+    const C = await getCfg(); const text = String(C.welcomeText || G.DEF_CFG.welcomeText).replace(/\{ism\}/g, c.name || '');
+    const pic = C.welcomeImg || mascot('walk'); const rm = appUrl ? appBtn(C, false) : undefined;
+    try { if (pic) { const m = await bot.api.sendPhoto(chatId, pic, { caption: text.slice(0, 1024), reply_markup: rm }); if (!C.welcomeImg) remember('walk', m); } else await bot.api.sendMessage(chatId, text, { reply_markup: rm }); }
+    catch (e) { try { await bot.api.sendMessage(chatId, text, { reply_markup: rm }); } catch (e2) { } }
+    await setMenu(chatId, C);
+  }
+  async function processJoins() {
+    const L = (await qWhere(store, 'ar_pays', [['kind', 'eq', 'join']])).filter(x => x.status === 'approved' || (x.status === 'rejected' && !x.notified));
+    if (!L.length) return 0; const C = await getCfg(); let n = 0;
+    for (const x of L) {
+      if (x.status === 'rejected') { await store.put('ar_pays', x.id, Object.assign({}, x, { notified: now() }));
+        const tg = await store.get('ar_tg', x.tgId); if (tg && tg.step === 'ref_wait') await store.put('ar_tg', x.tgId, Object.assign(tg, { step: 'ref_pay' }));
+        try { await bot.api.sendMessage(x.tgId, `❌ Toʻlovingiz tasdiqlanmadi.${x.reason ? '\nSabab: ' + x.reason : ''}\nChekni qaytadan yuborishingiz mumkin.`); } catch (e) { } n++; continue; }
+      await store.put('ar_pays', x.id, Object.assign({}, x, { status: 'creating' }));   // ikki marta yaratilmasin
+      try {
+        const tg = (await store.get('ar_tg', x.tgId)) || { tgId: x.tgId }; let c = tg.code ? await store.get('ar_codes', tg.code) : null;
+        let refBy = ''; const ref = x.ref || tg.ref || null;
+        if (ref && ref.t === 'u') { const P = await store.list('ar_codes', { fresh: true }); const r = P.find(k => pidOf(k.id) === ref.pid); if (r) refBy = r.id; }
+        if (!c || String(c.tgId) !== String(x.tgId)) {
+          const id = await newCode(); const crs = Array.isArray(C.refCourses) && C.refCourses.length ? C.refCourses.map(String) : undefined;
+          c = Object.assign({ id, name: x.name || tg.name || '', phone: x.phone || tg.phone || '', status: 'active', tgId: x.tgId, tgName: x.name || '', tgUsername: x.username || '', tgPhone: x.phone || tg.phone || '', phoneOk: true,
+            activatedAt: now(), lastBindAt: now(), created: now(), via: 'ref', ref, refBy, payId: x.id }, crs ? { courses: crs } : {});
+          await store.put('ar_codes', id, c);
+        }
+        await store.put('ar_tg', x.tgId, Object.assign(tg, { code: c.id, step: 'done', at: now() }));
+        await store.put('ar_pays', x.id, Object.assign({}, x, { status: 'ok', codeId: c.id, refBy, doneAt: now() }));
+        if (ref && ref.t === 'a') { const r = await store.get('ar_refs', ref.slug); if (r) await store.put('ar_refs', r.id, Object.assign(r, { joins: (+r.joins || 0) + 1 })); }
+        try { await bot.api.sendMessage(x.tgId, `🎉 Toʻlov tasdiqlandi! Obunangiz ochildi.\nSizning ID kodingiz: <b>${c.id}</b> (saqlab qoʻying).`, { parse_mode: 'HTML' }); } catch (e) { }
+        await welcomeTo(x.tgId, c);
+        const op = async (code, k, msg, why) => { if (k > 0) await store.put('ar_ops', G.uid(), { code, type: 'dinor', n: k, status: 'pending', at: now(), by: 'system', byName: 'Referal', note: why, msg }); };
+        await op(c.id, +C.refNewDinor || 0, `🎁 Xush kelibsiz sovgʻasi: +${C.refNewDinor} dinor!`, 'Referal: yangi aʼzo');
+        if (refBy) await op(refBy, +C.refDinor || 0, `🎉 Doʻstingiz ${c.name || ''} sizning havolangiz orqali qoʻshildi! +${C.refDinor} dinor sovgʻa`, 'Referal: doʻst taklif qildi');
+        n++;
+      } catch (e) { console.error('join', x.id, e.message); await store.put('ar_pays', x.id, Object.assign({}, x, { status: 'approved', err: e.message })); }
+    }
+    return n;
+  }
 
   /* buyurtma haqida operatorlarga xabar */
   async function notifyOrder(o) {
@@ -291,7 +402,7 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
   }
 
   bot.catch(err => console.error('bot xatosi:', err.error && err.error.message || err.message));
-  return { bot, welcome, notifyOrder, notifyPay, notifyCode, processMediaNotify, processMsgs, processReminders, normCode, setMenu };
+  return { bot, welcome, notifyOrder, notifyPay, notifyCode, processMediaNotify, processMsgs, processReminders, processJoins, normCode, setMenu, parseStart };
 }
 const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[ch]);
 

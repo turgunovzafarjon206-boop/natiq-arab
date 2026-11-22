@@ -505,6 +505,145 @@ async function courseSocialPayTests() {
   await api.flush();
 }
 
+async function socialTests() {
+  console.log('Ijtimoiy: hamjamiyat, post, like, obuna, reels, bellashuv, referal, kalendar');
+  const S = seed(); const tnow = { t: new Date('2026-11-20T07:00:00Z') };
+  const store = new MemoryStore({
+    ar_cfg: [{ id: 'main', followDinor: 3, likeEvery: 2, likeDinor: 5, reelsUser: 50, refDinor: 20, refNewDinor: 10, refSum: 99000, payCard: '8600 0000 0000 0001' }],
+    ar_letters: S.ar_letters,
+    ar_codes: [{ id: 'SAAAA1', name: 'Aziz', status: 'active', tgId: 601 }, { id: 'SBBBB2', name: 'Bobur', status: 'active', tgId: 602 }, { id: 'SCCCC3', name: 'Sevara', status: 'active', tgId: 603 }],
+    ar_tg: [{ id: '601', code: 'SAAAA1' }, { id: '602', code: 'SBBBB2' }, { id: '603', code: 'SCCCC3' }],
+    ar_posts: [{ id: 'reel1', kind: 'reel', admin: true, text: 'Admin reel', video: 'https://youtu.be/dQw4w9WgXcQ', at: '2026-11-19T10:00:00Z' }],
+    ar_contests: [{ id: 'ct1', title: 'Haftalik bellashuv', at: '2026-11-20T07:05:00Z', dur: 10, qn: 5, p1: 100, p2: 50, p3: 0 }],
+  });
+  const notes = [];
+  const api = createApi({ store, token: TOKEN, clock: () => tnow.t, onNotify: async (c, t) => notes.push([c, t]), botUser: () => 'natiq_arab_bot' });
+  const I = id => signInitData({ id, first_name: 'U' + id }, TOKEN);
+  const call = (n, b, id) => api.handle(n, Object.assign({ initData: I(id) }, b || {}));
+  let r = await call('me', {}, 601); ok('me: kalendar, unvon, ijtimoiy sozlamalar, bot nomi', r.status === 200 && r.body.prog.vis.includes('2026-11-20') && r.body.prog.medals.length === 6 && r.body.social.likeDinor === 5 && r.body.bot === 'natiq_arab_bot' && r.body.contest && r.body.contest.id === 'ct1', r.body);
+  for (const d of ['2026-11-21', '2026-11-22']) { tnow.t = new Date(d + 'T07:00:00Z'); r = await call('me', {}, 601); }
+  ok('3 kun ketma-ket → «Boshlovchi» unvoni', r.body.medal && r.body.medal.d === 3 && r.body.prog.vstreak === 3 && /Boshlovchi/.test(r.body.prog.title), r.body.prog);
+  tnow.t = new Date('2026-11-20T07:00:00Z');
+  await call('me', {}, 602); await call('me', {}, 603);
+  // hamjamiyat
+  r = await call('comm', { text: 'Assalomu alaykum hammaga!' }, 601); ok('hamjamiyatga xabar', r.status === 200 && r.body.item.text === 'Assalomu alaykum hammaga!', r.body);
+  const cid = r.body.item.id;
+  r = await call('comm', { stk: 'party' }, 602); ok('stiker yuborish', r.status === 200 && r.body.item.stk === 'party', r.body);
+  r = await call('comm', { img: 'data:image/png;base64,' + Buffer.alloc(3000, 1).toString('base64') }, 603); ok('rasm: soc/ papkasiga yuklandi', r.status === 200 && /\/soc\//.test(r.body.item.img), r.body);
+  r = await call('comm', { text: '' }, 603); ok('boʻsh xabar — 400', r.status === 400);
+  r = await call('react', { id: cid, e: '❤️' }, 602); ok('reaksiya', r.body.item.react['❤️'] === 1 && r.body.item.myReact.includes('❤️'), r.body);
+  r = await call('react', { id: cid, e: '🔥' }, 602); ok('bitta odam — bitta reaksiya (almashadi)', !r.body.item.react['❤️'] && r.body.item.react['🔥'] === 1, r.body.item.react);
+  r = await call('feed', {}, 603); ok('hamjamiyat lentasi (eskidan yangiga)', r.body.items.length === 3 && r.body.items[0].id === cid && r.body.items[0].react['🔥'] === 1, r.body.items.map(x => x.text || x.stk));
+  r = await call('pdel', { id: cid }, 602); ok('birovning xabarini oʻchirib boʻlmaydi', r.status === 403);
+  r = await call('pdel', { id: cid }, 601); ok('oʻz xabarini oʻchiradi', r.status === 200 && (await call('feed', {}, 601)).body.items.length === 2);
+  // obuna: dinor + bildirishnoma + bot xabari
+  const pidB = (await call('profile', { me: true }, 602)).body.pid;
+  r = await call('follow', { pid: pidB }, 601); ok('obuna boʻldi', r.body.iFollow === true, r.body);
+  await call('follow', { pid: pidB, on: false }, 601); await call('follow', { pid: pidB }, 601);   // qayta obuna — dinor ikkinchi marta berilmaydi
+  await call('follow', { pid: pidB }, 603);
+  const ops = (await store.list('ar_ops')).filter(o => o.code === 'SBBBB2');
+  ok('obunachi uchun dinor bir odamdan bir marta (2 kishi → 2 ta dinor)', ops.filter(o => o.type === 'dinor' && o.n === 3).length === 2 && ops.some(o => /obuna boʻldi/.test(o.msg)), ops);
+  r = await call('me', {}, 602); ok('obuna dinori balansga qoʻshildi, bot xabari ketdi', r.body.prog.dinor === 6 && notes.some(n => n[0] === 'SBBBB2' && /Aziz sizga obuna/.test(n[1])) && r.body.prog.unread >= 2, { d: r.body.prog.dinor, notes, un: r.body.prog.unread });
+  r = await call('notes', {}, 602); ok('bildirishnomalar: obuna', r.body.items.some(n => n.t === 'follow' && n.name === 'Aziz'), r.body.items);
+  ok('oʻqilgach — 0', (await call('me', {}, 602)).body.prog.unread === 0);
+  // post, like, izoh
+  r = await call('post', { text: 'Bugun «ب» harfini oʻrgandim', img: 'data:image/jpeg;base64,' + Buffer.alloc(4000, 2).toString('base64') }, 602); ok('profilga post', r.status === 200 && r.body.item.kind === 'post', r.body);
+  const pp = r.body.item.id;
+  r = await call('like', { id: pp }, 602); ok('oʻz postiga like — 400', r.status === 400);
+  r = await call('like', { id: pp }, 601); ok('like', r.body.item.likes === 1 && r.body.item.liked, r.body);
+  r = await call('like', { id: pp }, 603); ok('2-like', r.body.item.likes === 2);
+  await call('like', { id: pp, on: false }, 603); await call('like', { id: pp, on: true }, 603);   // olib tashlab qayta bosish — dinor qayta berilmaydi
+  const lo = (await store.list('ar_ops')).filter(o => o.code === 'SBBBB2' && /like/.test(o.msg));
+  ok('2 ta like = 5 dinor (bir marta)', lo.length === 1 && lo[0].n === 5, lo);
+  r = await call('cmt', { id: pp, text: 'Barakalla!' }, 603); ok('izoh', r.body.items.length === 1 && r.body.items[0].text === 'Barakalla!' && r.body.items[0].mine, r.body);
+  const cm1 = r.body.items[0].id;
+  r = await call('cdel', { id: pp, cid: cm1 }, 602); ok('post egasi izohni oʻchira oladi', r.body.items.length === 0, r.body);
+  r = await call('posts', { pid: pidB }, 601); ok('profil postlari', r.body.items.length === 1 && r.body.items[0].likes === 2 && r.body.items[0].liked, r.body);
+  r = await call('profile', { pid: pidB }, 601); ok('profilda postlar soni va unvonlar', r.body.posts === 1 && r.body.medals.length === 6, r.body);
+  // reels: admin + oʻquvchilar postlari
+  r = await call('reels', {}, 601); ok('reels: admin reel (YouTube) + oʻquvchi posti', r.body.items.some(x => x.id === 'reel1' && x.yt === 'dQw4w9WgXcQ' && !x.video) && r.body.items.some(x => x.id === pp), r.body.items.map(x => x.id));
+  r = await call('reels', { seen: ['reel1', pp] }, 601); ok('hammasi koʻrilgan — boshidan', r.body.again === true && r.body.items.length === 2, r.body);
+  // referal
+  r = await call('ref', {}, 601); ok('referal havola', r.body.link === 'https://t.me/natiq_arab_bot?start=r_' + api.pidOf('SAAAA1') && r.body.dinor === 20, r.body);
+  // bellashuv
+  r = await call('cstart', { id: 'ct1' }, 601); ok('bellashuv hali boshlanmagan — 400', r.status === 400 && /boshlanmadi/.test(r.body.error), r.body);
+  tnow.t = new Date('2026-11-20T06:56:00Z'); await api.social.tick();
+  const cm = (await store.list('ar_msgs')).filter(m => m.auto === 'contest');
+  ok('10 daqiqa oldin hammaga xabar navbatga qoʻyildi', cm.length === 1 && /10 daqiqadan/.test(cm[0].text) && /100 dinor/.test(cm[0].text), cm);
+  await api.social.tick(); ok('eslatma bir marta', (await store.list('ar_msgs')).filter(m => m.auto === 'contest').length === 1);
+  tnow.t = new Date('2026-11-20T07:06:00Z');
+  const play = async (id, good) => { let s = (await call('cstart', { id: 'ct1' }, id)).body.sess; const L = s.items.length;
+    for (let i = 0; i < L; i++) { const st = (await api.handle('step', { initData: I(id), sid: s.sid, i, ...(i < good ? R(s.items[i].k !== undefined ? s.items[i] : s.items[i]) : {}) })).body; if (st.end) return st; } };
+  // toʻgʻri javoblar uchun serverdagi sessiyadan k ni olamiz
+  const prog = async code => (await store.get('ar_prog', code));
+  const playK = async (id, code, good) => { const r0 = await call('cstart', { id: 'ct1' }, id); const sid = r0.body.sess.sid; await api.flush(); let last;
+    for (let i = 0; i < r0.body.sess.n; i++) { const it = (await prog(code)).sess.items[i]; last = (await api.handle('step', Object.assign({ initData: I(id), sid, i }, i < good ? R(it) : W(it)))).body; await api.flush(); } return { r0, last }; };
+  const A1 = await playK(601, 'SAAAA1', 5), B1 = await playK(602, 'SBBBB2', 3);
+  ok('hamma uchun savollar bir xil', JSON.stringify(A1.r0.body.sess.items.map(x => x.q + x.ar)) === JSON.stringify(B1.r0.body.sess.items.map(x => x.q + x.ar)), [A1.r0.body.sess.items.length]);
+  ok('bellashuv tugadi: natija', A1.last.end && A1.last.end.mode === 'contest' && A1.last.end.ok === 5, A1.last);
+  r = await call('cstart', { id: 'ct1' }, 601); ok('qayta qatnashib boʻlmaydi', r.status === 400, r.body);
+  r = await call('contests', {}, 603); const cv = r.body.items.find(x => x.id === 'ct1');
+  ok('jonli natijalar jadvali', cv.st === 'live' && cv.top[0].name === 'Aziz' && cv.top[0].ok === 5 && cv.top[1].ok === 3, cv);
+  tnow.t = new Date('2026-11-20T07:16:00Z'); await api.social.tick();
+  const ct = await store.get('ar_contests', 'ct1'); const wo = (await store.list('ar_ops')).filter(o => /Bellashuv/.test(o.note || ''));
+  ok('yakun: 1-oʻringa 100, 2-oʻringa 50 dinor', ct.status === 'done' && ct.winners[0].code === 'SAAAA1' && wo.some(o => o.code === 'SAAAA1' && o.n === 100) && wo.some(o => o.code === 'SBBBB2' && o.n === 50), { ct, wo });
+  // rejalashtirilgan xabarlar
+  await store.put('ar_cfg', 'sched', { on: true, time: '09:00', items: [{ text: '1-xabar' }, { text: '2-xabar' }], idx: 0 });
+  tnow.t = new Date('2026-11-20T03:30:00Z'); await api.social.tick(); ok('vaqti kelmagan — yuborilmaydi', !(await store.list('ar_msgs')).some(m => m.auto === 'sched'));
+  tnow.t = new Date('2026-11-20T04:01:00Z'); await api.social.tick(); await api.social.tick();
+  tnow.t = new Date('2026-11-21T04:01:00Z'); await api.social.tick(); tnow.t = new Date('2026-11-22T04:01:00Z'); await api.social.tick();
+  const sm = (await store.list('ar_msgs')).filter(m => m.auto === 'sched').sort((a, b) => a.at.localeCompare(b.at)).map(m => m.text);
+  ok('har kuni bittadan, aylanib takrorlanadi', sm.join('|') === '1-xabar|2-xabar|1-xabar', sm);
+  await api.flush();
+}
+
+async function refBotTests() {
+  console.log('Referal: havola → video → toʻlov → admin tasdiqlaydi → ID avtomatik');
+  const crypto = require('crypto'); const pid = code => crypto.createHmac('sha256', TOKEN).update('pid:' + code).digest('hex').slice(0, 12);
+  const store = new MemoryStore({ ar_cfg: [{ id: 'main', refDinor: 20, refNewDinor: 10, refSum: 99000, refVideo: 'https://x.test/intro.mp4', payCard: '8600 1111 2222 3333', notifyChats: '-100' }],
+    ar_codes: [{ id: 'RAAAA1', name: 'Taklif qiluvchi', status: 'active', tgId: 701 }], ar_tg: [{ id: '701', code: 'RAAAA1' }], ar_refs: [{ id: 'instagram', name: 'Instagram', clicks: 0, joins: 0 }] });
+  const calls = []; const A = createArArabBot(store, calls);
+  const user = (id, f) => ({ id, is_bot: false, first_name: f }); let u = 1;
+  const msg = (from, x) => ({ update_id: u++, message: Object.assign({ message_id: u, date: Math.floor(Date.now() / 1000), chat: { id: from.id, type: 'private' }, from }, x) });
+  const cmd = (from, t) => msg(from, { text: t, entities: [{ type: 'bot_command', offset: 0, length: t.split(' ')[0].length }] });
+  const cb = (from, data) => ({ update_id: u++, callback_query: { id: 'q' + u, from, chat_instance: '1', data, message: { message_id: 1, date: 0, chat: { id: from.id, type: 'private' } } } });
+  const last = () => calls[calls.length - 1]; const F = user(801, 'Doʻst');
+  await A.bot.handleUpdate(cmd(F, '/start r_' + pid('RAAAA1')));
+  ok('referal havola: tanishtiruv video + «Qoʻshilish»', last().method === 'sendVideo' && last().payload.reply_markup.inline_keyboard[0][0].callback_data === 'rj', last());
+  await A.bot.handleUpdate(cb(F, 'rj')); ok('qoʻshilish → telefon soʻraladi', last().payload.reply_markup && last().payload.reply_markup.keyboard[0][0].request_contact, last());
+  await A.bot.handleUpdate(msg(F, { contact: { phone_number: '998907770011', first_name: 'D', user_id: 801 } }));
+  ok('telefon → toʻlov maʼlumoti (summa, karta)', /99 000/.test(last().payload.text) && /8600 1111 2222 3333/.test(last().payload.text), last().payload.text);
+  await A.bot.handleUpdate(msg(F, { photo: [{ file_id: 'PH1', file_unique_id: 'u', width: 10, height: 10, file_size: 100 }] }));
+  const jp = (await store.list('ar_pays')).find(x => x.kind === 'join');
+  ok('chek qabul qilindi: toʻlov yozildi, operatorga xabar', jp && jp.status === 'new' && jp.phone === '+998907770011' && jp.ref.pid === pid('RAAAA1') && calls.some(c => c.method === 'sendPhoto' && c.payload.chat_id === '-100'), jp);
+  await store.put('ar_pays', jp.id, Object.assign(jp, { status: 'approved' }));   // admin saytda tasdiqladi
+  await A.processJoins();
+  const tg = await store.get('ar_tg', 801); const nc = tg && await store.get('ar_codes', tg.code);
+  ok('ID avtomatik yaratildi va Telegram’ga biriktirildi', nc && nc.status === 'active' && nc.tgId === 801 && nc.refBy === 'RAAAA1' && (await store.get('ar_pays', jp.id)).status === 'ok', { tg, nc });
+  const ro = await store.list('ar_ops'); ok('ikkalasiga referal sovgʻasi', ro.some(o => o.code === 'RAAAA1' && o.n === 20) && ro.some(o => o.code === nc.id && o.n === 10), ro);
+  ok('xush kelibsiz + ilova tugmasi', calls.some(c => c.payload.chat_id === 801 && c.payload.reply_markup && JSON.stringify(c.payload.reply_markup).includes('web_app')));
+  // admin havolasi
+  const G2 = user(802, 'Ikkinchi'); await A.bot.handleUpdate(cmd(G2, '/start a_instagram'));
+  ok('admin havolasi: bosishlar hisoblanadi', (await store.get('ar_refs', 'instagram')).clicks === 1 && last().method === 'sendVideo');
+  // rad etish
+  await A.bot.handleUpdate(cb(G2, 'rj')); await A.bot.handleUpdate(msg(G2, { contact: { phone_number: '998907770022', first_name: 'I', user_id: 802 } }));
+  await A.bot.handleUpdate(msg(G2, { photo: [{ file_id: 'PH2', file_unique_id: 'u2', width: 10, height: 10 }] }));
+  const j2 = (await store.list('ar_pays')).find(x => x.tgId === 802); await store.put('ar_pays', j2.id, Object.assign(j2, { status: 'rejected', reason: 'Summa notoʻgʻri' })); await A.processJoins();
+  ok('rad etildi — sababi bilan xabar', calls.some(c => c.payload.chat_id === 802 && /tasdiqlanmadi/.test(c.payload.text || '') && /Summa/.test(c.payload.text || '')));
+  // ulashilgan post
+  await store.put('ar_posts', 'pst123456', { kind: 'post', code: 'RAAAA1', name: 'Taklif qiluvchi', text: 'Mening postim', at: new Date().toISOString() });
+  await A.bot.handleUpdate(cmd(user(701, 'T'), '/start ppst123456_' + pid('RAAAA1')));
+  ok('ulashilgan post: «Ilovada ochish» tugmasi', /Mening postim/.test(last().payload.text) && last().payload.reply_markup.inline_keyboard[0][0].web_app.url.includes('post=pst123456'), last());
+}
+function createArArabBot(store, calls) {
+  const A = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app', fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new Uint8Array(500).buffer }),
+    botOpts: { botInfo: { id: 7, is_bot: true, first_name: 'N', username: 'natiq_arab_bot', can_join_groups: false, can_read_all_group_messages: false, supports_inline_queries: false } } });
+  A.bot.api.config.use(async (prev, method, payload) => { calls.push({ method, payload: JSON.parse(JSON.stringify(payload || {})) });
+    if (method === 'getFile') return { ok: true, result: { file_id: payload.file_id, file_path: 'photos/x.jpg' } };
+    return { ok: true, result: /^send/.test(method) ? { message_id: calls.length, date: 0, chat: { id: payload.chat_id, type: 'private' } } : true }; });
+  return A;
+}
+
 (async () => {
   gameTests();
   quizTests();
@@ -513,6 +652,8 @@ async function courseSocialPayTests() {
   await botTests(store);
   await apiTests(store);
   await courseSocialPayTests();
+  await socialTests();
+  await refBotTests();
   console.log(fails ? `\n❌ ${fails} ta sinov oʻtmadi` : '\n✅ Barcha sinovlar oʻtdi');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

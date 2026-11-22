@@ -12,6 +12,7 @@ boshqaruv esa natiq.uz → **Mini ilova** boʻlimida.
 | `api.js` | Mini App API (Telegram initData tekshiruvi, javoblar faqat serverda tekshiriladi) |
 | `game.js` | Oʻyin qoidalari: jon, dinor, takrorlash, bogʻ, reyting |
 | `quiz.js` | 9 xil mashq turi va javobni serverda tekshirish |
+| `social.js` | Hamjamiyat, profil postlari, like/izoh, reels, bildirishnomalar, referal havola, bellashuv, rejalashtirilgan xabarlar |
 | `store.js` | Supabase bilan ishlash |
 | `mtproto.js` | Katta fayllar (20 MB+) — Telegramdan oqim |
 | `app.html` | Mini App (oʻquvchi koʻradigan ilova) |
@@ -74,3 +75,17 @@ Boshqa akkauntdan foydalanish: ID kodlar → 📱 → yangi Telegram ID (oʻquvc
 Saytda Sozlamalar → «💳 Dinor sotib olish»: tariflar (masalan `200 = 20000`), karta raqami. Oʻquvchi ilovada tarif tanlaydi,
 kartaga toʻlaydi va chek rasmini yuklaydi → saytda «💳 Toʻlovlar» → Tasdiqlash: dinor qoʻshiladi va bot xabar yuboradi
 («Rad etish» — sababi bilan xabar boradi). Dinorni pulga almashtirib boʻlmaydi. Operatorlarga (Sozlamalardagi chat ID’lar) chek rasmi bilan xabar keladi.
+
+## Ijtimoiy qism, referal, bellashuv (yangilar37)
+- **Hamjamiyat** (Profil → 💬): umumiy suhbat — matn, stiker (Natiq boyqushi), rasm, ovozli xabar; reaksiyalar; oʻz xabarini oʻchirish.
+- **Profil postlari**: rasm, ovoz, matn; like, izoh, Telegram orqali ulashish. Like uchun dinor — Sozlamalar (masalan, 10 like = 5 dinor).
+- **Obuna**: obuna boʻlinganga botdan va ilova ichida (🔔) xabar; admin belgilagan dinor (bir odamdan bir marta).
+- **Reels** (pastdagi 🎬): admin joylagan video/rasm/matn + oʻquvchilar postlari (ulushi — saytda).
+- **Unvonlar** (3 kun … 10 hafta ketma-ket kirish) va **faollik kalendari** (🔥 kirgan, qizil — kirmagan kunlar).
+- **Referal**: `t.me/<bot>?start=r_<pid>` (shaxsiy) yoki `?start=a_<nom>` (admin havolasi) → tanishtiruv video → «Qoʻshilish» → telefon → toʻlov → chek → saytda tasdiqlanadi → ID avtomatik ochiladi, ikkalasiga dinor.
+- **Bellashuv**: belgilangan vaqtda hamma bir xil savollarni yechadi; 10 daqiqa oldin hammaga bot xabari; yakunda 1–3-oʻrinlarga dinor.
+- **Rejalashtirilgan xabarlar**: har kuni belgilangan vaqtda navbatdagi bittasi, aylanib takrorlanadi.
+- **YouTube** havolali darslar oʻz pleerimizda chiqadi — YouTube belgilari koʻrinmaydi.
+- Oʻquvchilar yuklagan rasm/ovoz «arab/soc/» papkasida turadi va ilovaga server orqali (`/u/…`, diskda kesh) beriladi — Supabase trafigi tejaladi.
+
+`app.html` qismlardan yigʻiladi: `cat parts/a_head.html parts/b_core.js parts/c_lesson.js parts/d_garden.js parts/e_profile.js parts/f_social.js parts/z_end.html > app.html`
