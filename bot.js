@@ -231,14 +231,24 @@ function createArabBot({ token, store, appUrl, botOpts, cfg, clock = () => new D
     m = /^p([A-Za-z0-9]{6,40})_([a-f0-9]{12})$/.exec(s); if (m) return { post: m[1], ref: { t: 'u', pid: m[2] } };
     return {};
   }
+  const ytId = u => { const m = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/))([\w-]{11})/.exec(String(u || '')); return m ? m[1] : ''; };
   const JOIN_KB = { inline_keyboard: [[{ text: '➕ Qoʻshilish', callback_data: 'rj' }], [{ text: '🔑 Menda ID kod bor', callback_data: 'rid' }]] };
   async function refIntro(ctx, tg, P) {
     const C = await getCfg(); const id = ctx.from.id;
     if (P.ref.t === 'a') { const r = await store.get('ar_refs', P.ref.slug); if (r) await store.put('ar_refs', r.id, Object.assign(r, { clicks: (+r.clicks || 0) + 1 })); }
     await store.put('ar_tg', id, Object.assign({}, tg || {}, { tgId: id, name: tgName(ctx.from), username: ctx.from.username || '', ref: P.ref, refAt: now(), step: (tg && tg.step === 'ref_wait') ? 'ref_wait' : 'ref', at: now() }));
     const text = String(C.refText || G.DEF_CFG.refText).slice(0, 1024); const v = String(C.refVideo || '').trim();
-    let vid = v; const mt = /^tg:(\d+)$/.exec(v); if (mt) { const md = await store.get('ar_media', mt[1]); vid = md && (md.fileId || md.url) || ''; }
+    /* YouTube havolasi: Telegram uni video sifatida yubora olmaydi → muqova + «▶️ Videoni koʻrish» (Mini App’dagi oʻz pleerimiz, YouTube belgilari koʻrinmaydi) */
+    const yt = ytId(v); const watch = appUrl ? appUrl.replace(/\/app(?:[/?#].*)?$/, '') + '/intro' : '';
+    let vid = yt ? '' : v; const mt = /^tg:(\d+)$/.exec(v); if (mt) { const md = await store.get('ar_media', mt[1]); vid = md && (md.fileId || md.url) || ''; }
     if (vid) { try { return await ctx.replyWithVideo(vid, { caption: text, reply_markup: JOIN_KB, supports_streaming: true }); } catch (e) { console.error('ref video', e.message); } }
+    if ((yt || vid) && watch) {
+      const kb = { inline_keyboard: [[{ text: '▶️ Videoni koʻrish', web_app: { url: watch } }], ...JOIN_KB.inline_keyboard] };
+      const pics = [C.refImg, yt && `https://i.ytimg.com/vi/${yt}/maxresdefault.jpg`, yt && `https://i.ytimg.com/vi/${yt}/hqdefault.jpg`, C.welcomeImg].filter(Boolean);
+      for (const pic of pics) { try { return await ctx.replyWithPhoto(pic, { caption: '▶️ ' + text.slice(0, 1020), reply_markup: kb }); } catch (e) { } }
+      return ctx.reply(text, { reply_markup: kb });
+    }
+    if (yt) return ctx.reply(text + '\n\n▶️ https://youtu.be/' + yt, { reply_markup: JOIN_KB });   // ilova manzili (APP_URL) yoʻq boʻlsa — oddiy havola
     const pic = C.welcomeImg || mascot('walk');
     if (pic) { try { const m = await ctx.replyWithPhoto(pic, { caption: text, reply_markup: JOIN_KB }); if (!C.welcomeImg) remember('walk', m); return m; } catch (e) { } }
     return ctx.reply(text, { reply_markup: JOIN_KB });

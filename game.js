@@ -20,6 +20,8 @@ const DEF_CFG = {
   remindText: '{ism}, seni sogʻindim! 🦉\n{kun} kundan beri darsga kirmading. Bugun atigi 5 daqiqa ajrat — jonlaringni toʻldir, dinor yigʻ va bogʻingni sugʻor! 🌳',
   /* ijtimoiy: obuna, post, like, hamjamiyat, reels */
   socialOn: true, followDinor: 0, likeEvery: 10, likeDinor: 0, postsPerDay: 10, commPerDay: 60, reelsUser: 30,
+  wallOn: true, wallPerDay: 30,                          // profil izohlari
+  refImg: '',                                            // YouTube tanishtiruv videosi uchun muqova (boʻlmasa — videoning oʻz muqovasi)
   /* referal: havola → tanishtiruv video → toʻlov → admin tasdiqlaydi → ID avtomatik ochiladi */
   refOn: true, refDinor: 0, refNewDinor: 0, refVideo: '', refSum: 0, refPayUrl: '', refCourses: [],
   refText: 'Assalomu alaykum! 👋\n«Natiq Arabic» — arab tilini oʻyin orqali, qadamma-qadam oʻrganish ilovasi: video darslar, talaffuz, testlar, dinor va sovgʻalar.\n\nQoʻshilish uchun pastdagi tugmani bosing 👇',
@@ -347,6 +349,8 @@ function applyOp(prog, op, cfg) {
   cfg = cfgOf(cfg); const n = Math.round(+op.n || 0);
   if (op.type === 'dinor' || op.type === 'refund') { prog.dinor = Math.max(0, (prog.dinor || 0) + n); if (op.type === 'refund') prog.spent = Math.max(0, (prog.spent || 0) - n); }
   else if (op.type === 'msg') { /* faqat bot xabari (masalan, toʻlov rad etildi) */ }
+  else if (op.type === 'wall') {   /* admin profilga izoh qoldirdi (saytdan) — ilova ichidagi bildirishnoma; bot xabari op.msg orqali */
+    prog.notes = [{ t: 'wall', admin: true, name: op.byName || 'Admin', text: String(op.text || '').slice(0, 80), at: op.at || new Date().toISOString() }, ...(prog.notes || [])].slice(0, 60); prog.unread = Math.min(99, (prog.unread || 0) + 1); }
   else if (op.type === 'hearts') prog.hearts = Math.min(cfg.maxHearts, Math.max(0, n));
   else if (op.type === 'reset') { const keep = { code: prog.code, name: prog.name, tgId: prog.tgId, lang: prog.lang, dark: prog.dark };
     Object.keys(prog).forEach(k => delete prog[k]); Object.assign(prog, freshProg(keep.code), keep); }

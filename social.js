@@ -1,8 +1,11 @@
 /* Natiq Arab — ijtimoiy qism: hamjamiyat (umumiy suhbat), profil postlari, like/izoh, reels,
    bildirishnomalar, referal havola, bellashuv, rejalashtirilgan xabarlar.
-   Maʼlumotlar: ar_posts (kind: comm | post | reel), ar_centry (bellashuv natijalari), ar_contests, ar_refs, ar_cfg/sched.
+   Maʼlumotlar: ar_posts (kind: comm | post | reel | wall — profil izohi), ar_centry (bellashuv natijalari), ar_contests, ar_refs, ar_cfg/sched.
    Rasm va ovozlar «arab» papkasida (soc/…) — ilovaga server orqali (/u/…) keshlab beriladi: Supabase trafigi tejaladi. */
 const crypto = require('crypto');
+const { DEF_SCHED, DEF_SCHED_TIME } = require('./sched-default');
+/* «08:30, 19:30» → ['08:30','19:30'] */
+const schedTimes = v => [...new Set(String(v || '09:00').split(/[\s,;]+/).map(x => /^(\d{1,2}):(\d{2})$/.exec(x)).filter(m => m && +m[1] < 24 && +m[2] < 60).map(m => m[1].padStart(2, '0') + ':' + m[2]))].sort();
 
 const REACTS = ['👍', '❤️', '😂', '😮', '🔥', '🤲'];
 let SEQ = Date.now();
@@ -119,6 +122,18 @@ function createSocial(x) {
     async cdel({ c }, b) { await lock('post:' + b.id, async () => { const M = await posts(); const p = M.get(String(b.id || '')); if (!p) throw new ApiError(404, 'Post topilmadi');
         const x = (p.comments || []).find(k => k.id === b.cid); if (!x) return; if (x.code !== c.id && p.code !== c.id) throw new ApiError(403, 'Ruxsat yoʻq');
         p.comments = p.comments.filter(k => k.id !== b.cid); await savePost(p); }); return H.cmts({ c }, b); },
+    /* profil izohlari: admin (saytdan) va boshqa oʻquvchilar yozadi; profil egasi istalganini, muallif — oʻzinikini oʻchiradi */
+    async wall({ c }, b) { const P = await allProgs(); const t = wallTarget(P, c, b); return { items: await wallItems(t.code, c.id), on: (await cfg()).wallOn !== false }; },
+    async wallAdd({ c, user }, b) { const C = await cfg(); if (C.wallOn === false) throw new ApiError(403, 'Izohlar vaqtincha yopiq');
+      const text = clean(b.text, 500); if (!text) throw new ApiError(400, 'Izoh boʻsh'); const P = await allProgs(); const t = wallTarget(P, c, b);
+      const M = await posts(); if (countToday(M, c.id, 'wall') >= (C.wallPerDay || 30)) throw new ApiError(429, 'Bugun yetarlicha izoh yozdingiz — ertaga davom eting');
+      const p = await loadProg(c, user); const x = { id: G.uid(), kind: 'wall', to: t.code, code: c.id, name: p.name, text, at: now(), n: ++SEQ };
+      await savePost(x);
+      if (t.code !== c.id) setImmediate(() => note(t.code, { t: 'wall', pid: pidOf(c.id), name: p.name, text: text.slice(0, 80) }));
+      return { items: await wallItems(t.code, c.id), on: true }; },
+    async wallDel({ c }, b) { const M = await posts(); const p = M.get(String(b.id || '')); if (!p || p.kind !== 'wall') throw new ApiError(404, 'Izoh topilmadi');
+      if (p.code !== c.id && p.to !== c.id) throw new ApiError(403, 'Faqat oʻzingiz yozganini yoki oʻz profilingizdagini oʻchira olasiz');
+      await dropPost(p.id); return { items: await wallItems(p.to, c.id), on: true }; },
     /* reels: admin joylagan video/rasm/matn + oʻquvchilar postlari (admin belgilagan foizda) */
     async reels({ c }, b) { const C = await cfg(); const M = await posts(); const P = await allProgs(); const seen = new Set((Array.isArray(b.seen) ? b.seen : []).map(String).slice(-500));
       const all = [...M.values()].filter(p => !p.hidden);
@@ -152,6 +167,14 @@ function createSocial(x) {
         await store.put('ar_centry', ct.id + '_' + c.id, { cid: ct.id, code: c.id, name: p.name, ok: 0, n: r.sess.items.length, i: 0, startAt: now(), ms: 0, done: false });
         await saveProg(p); return { sess: G.sessPublic(r.sess), hearts: p.hearts, now: now() }; }); },
   };
+  /* profil izohlari */
+  function wallTarget(P, c, b) { const t = b.pid ? byPid(P, b.pid) : (P.find(x => x.code === c.id) || { code: c.id });
+    if (!t) throw new ApiError(404, 'Profil topilmadi'); if (t.hideRank && t.code !== c.id) throw new ApiError(403, 'Bu profil yashirilgan'); return t; }
+  async function wallItems(code, me) { const M = await posts(); const P = await allProgs(); const C = await cfg();
+    return [...M.values()].filter(p => p.kind === 'wall' && p.to === code && !p.hidden).sort((a, z) => String(z.at).localeCompare(String(a.at)) || (+z.n || 0) - (+a.n || 0)).slice(0, 100)
+      .map(p => ({ id: p.id, admin: !!p.admin, name: p.admin ? (p.name || C.appName || 'Natiq') : nameOf(P, p.code, p.name), pid: p.admin || !p.code ? '' : pidOf(p.code), text: p.text || '', at: p.at,
+        mine: !!p.code && p.code === me, canDel: (!!p.code && p.code === me) || code === me })); }
+
   /* bellashuv koʻrinishi: holat, mening natijam, top-10 */
   async function cView(ct, me) {
     const st = G.contestState(ct, clock().getTime()); const E = st === 'soon' ? [] : await qWhere(store, 'ar_centry', [['cid', 'eq', ct.id]]);
@@ -187,20 +210,26 @@ function createSocial(x) {
           setImmediate(() => note(R[i].code, { t: 'contest', name: ct.title || 'Bellashuv', rank: i + 1, n: pr[i] })); }
         await store.put('ar_contests', ct.id, Object.assign({}, ct, { status: 'done', doneAt: now(), winners: win, total: R.length })); n++; }
     }
-    /* rejalashtirilgan xabarlar: har kuni belgilangan vaqtda navbatdagi bittasi (aylanib takrorlanadi) */
-    const S = await store.get('ar_cfg', 'sched');
+    /* rejalashtirilgan xabarlar: belgilangan vaqt(lar)da navbatdagi bittasi; oxiriga yetgach — boshidan (aylanib takrorlanadi).
+       Hali sozlanmagan boʻlsa — tayyor 30 ta xabar avtomatik joylanadi va yoqiladi. */
+    let S = await store.get('ar_cfg', 'sched');
+    if (!S || (!(S.items || []).some(i => i && (String(i.text || '').trim() || i.img)) && !S.seeded)) {
+      S = Object.assign({ on: true, time: DEF_SCHED_TIME, target: 'all', btn: true, idx: 0 }, S || {}, { on: true, items: DEF_SCHED.map(text => ({ text })), idx: 0, seeded: now() });
+      if (!S.time) S.time = DEF_SCHED_TIME; await store.put('ar_cfg', 'sched', S); }
     if (S && S.on && Array.isArray(S.items) && S.items.length) {
       const tz = new Date(t + 5 * 3600e3); const d = tz.toISOString().slice(0, 10), hm = tz.toISOString().slice(11, 16);
       const items = S.items.filter(i => i && (String(i.text || '').trim() || i.img));
-      if (items.length && S.lastDay !== d && hm >= String(S.time || '09:00')) {
+      const due = schedTimes(S.time).filter(x => x <= hm).pop();   // bugun oʻtgan eng soʻnggi vaqt (oʻtkazib yuborilganlari yigʻilib ketmaydi)
+      const last = S.lastKey || (S.lastDay ? S.lastDay + ' 23:59' : '');
+      if (items.length && due && last < d + ' ' + due) {
         const k = (+S.idx || 0) % items.length; const it = items[k];
-        await store.put('ar_cfg', 'sched', Object.assign({}, S, { lastDay: d, idx: k + 1, lastAt: now() }));
+        await store.put('ar_cfg', 'sched', Object.assign({}, S, { lastDay: d, lastKey: d + ' ' + due, idx: k + 1, lastAt: now(), rounds: (+S.rounds || 0) + (k + 1 === items.length ? 1 : 0) }));
         await store.put('ar_msgs', G.uid(), { status: 'pending', target: S.target === 'group' ? 'group' : 'all', groupId: S.groupId || '', text: String(it.text || ''), img: it.img || '', btn: S.btn !== false, auto: 'sched', schedN: k + 1, at: now() });
         n++; }
     }
     return n;
   }
-  return { H, tick, contestStep, posts, px, REACTS };
+  return { H, tick, contestStep, posts, px, REACTS, wallItems };
 }
 
-module.exports = { createSocial, REACTS, ytId };
+module.exports = { createSocial, REACTS, ytId, schedTimes };

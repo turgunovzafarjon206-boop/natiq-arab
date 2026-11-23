@@ -176,7 +176,8 @@ function createApi({ store, token, onOrder = async () => {}, onPay = async () =>
       const trees = t.trees || [];
       return { pid: pidOf(t.code), name: t.name || 'Oʻquvchi', me: isMe, dinor: +t.dinor || 0, lessons: t.lessons || 0, trees: trees.length, fruit: trees.reduce((a, x) => a + (x.fruit || 0), 0), sold: t.sold || 0,
         days: t.days || 0, streak: t.streak || 0, items, followers: fl.length, following: followingOf(P, t).length, iFollow: (me.follows || []).includes(t.code),
-        title: G.titleOf(t), medals: G.medalsOf(t), vstreak: G.vStreak(t, clock()), vbest: t.vbest || 0, posts: (await SOC.posts()) ? [...(await SOC.posts()).values()].filter(x => x.kind === 'post' && x.code === t.code && !x.hidden).length : 0 };
+        title: G.titleOf(t), medals: G.medalsOf(t), vstreak: G.vStreak(t, clock()), vbest: t.vbest || 0, posts: (await SOC.posts()) ? [...(await SOC.posts()).values()].filter(x => x.kind === 'post' && x.code === t.code && !x.hidden).length : 0,
+        wall: await SOC.wallItems(t.code, c.id), wallOn: (await cfg()).wallOn !== false };
     },
     async follow({ c, user }, b) {
       return lock(c.id, async () => { const P = await allProgs(); const t = byPid(P, b.pid); if (!t || t.hideRank) throw new ApiError(404, 'Profil topilmadi');

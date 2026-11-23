@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Tanishtiruv video</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* Referal havolasi orqali kelganlar uchun tanishtiruv video: YouTube havolasi oʻz pleerimizda (YouTube belgilari koʻrinmaydi) yoki MP4 */
+:root{--gold:#E9A800;--gold-d:#C98A00;--bg:#FFFCF3;--ink:#2A200E;--mut:#7A6B4E;--card:#fff;--line:#F1E6C8}
+:root.dark{--bg:#17140E;--ink:#F6EEDC;--mut:#B5A784;--card:#221E15;--line:#3A3220}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--ink);font-family:Nunito,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100%}
+.wrap{max-width:560px;margin:0 auto;padding:14px 14px calc(24px + env(safe-area-inset-bottom))}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:18px;margin:2px 0 12px}
+.logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(160deg,#FFD84D,#F5A400 60%,#C98A00);display:grid;place-items:center;color:#fff;font-size:24px;box-shadow:inset 0 2px 0 rgba(255,255,255,.5)}
+.vp{position:relative;width:100%;aspect-ratio:16/9;border-radius:20px;overflow:hidden;background:#000;user-select:none;-webkit-user-select:none;box-shadow:0 12px 30px rgba(0,0,0,.18)}
+.vp.tall{aspect-ratio:9/16;max-height:72vh;margin:0 auto}
+.vf{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.vf iframe,.vf>div{position:absolute;left:0;top:-60px;width:100%!important;height:calc(100% + 120px)!important;border:0}
+.vp video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+.cov{position:absolute;inset:0;z-index:2;background:#000 center/cover no-repeat;transition:opacity .25s}
+.vp.playing .cov{opacity:0;pointer-events:none}
+.tapz{position:absolute;inset:0;z-index:3;display:grid;place-items:center;cursor:pointer}
+.pb{width:78px;height:78px;border-radius:50%;background:rgba(0,0,0,.5);border:3px solid #fff;display:grid;place-items:center;transition:opacity .2s,transform .2s}
+.pb svg{width:34px;height:34px;margin-left:5px;fill:#fff}.vp.playing .pb{opacity:0;transform:scale(.8)}.vp.loading .pb{animation:pl .8s infinite}
+@keyframes pl{50%{transform:scale(.9);opacity:.7}}
+.bar{position:absolute;left:0;right:0;bottom:0;z-index:4;display:flex;align-items:center;gap:8px;padding:8px 12px 10px;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;opacity:0;transition:opacity .2s;pointer-events:none}
+.vp.started .bar{opacity:1;pointer-events:auto}
+.bar button{background:none;border:0;color:#fff;width:32px;height:32px;display:grid;place-items:center;font-size:18px}.bar svg{width:20px;height:20px;fill:#fff}
+.bar input{flex:1;accent-color:var(--gold);height:4px}.tm{font-size:12px;font-weight:800;white-space:nowrap}
+.vp.fs{position:fixed;inset:0;z-index:50;border-radius:0;aspect-ratio:auto;width:100vw;height:100vh;max-height:none}
+.vp.fs.rot{width:100vh;height:100vw;top:50%;left:50%;transform:translate(-50%,-50%) rotate(90deg)}
+.txt{white-space:pre-line;line-height:1.5;font-size:15.5px;font-weight:700;margin:16px 2px 18px}
+.btn{display:block;width:100%;border:0;border-radius:16px;padding:16px;font-family:inherit;font-weight:900;font-size:17px;line-height:1;color:#fff;background:linear-gradient(180deg,#FFC83D,var(--gold) 60%,var(--gold-d));box-shadow:0 5px 0 #A86E00;cursor:pointer}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #A86E00}
+.hint{font-size:13.5px;color:var(--mut);text-align:center;margin-top:12px;font-weight:700}
+.err{padding:30px 10px;text-align:center;color:var(--mut);font-weight:800}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="err">Yuklanmoqda…</div></div>
+<script>
+const TG=window.Telegram&&Telegram.WebApp;try{TG&&TG.ready();TG&&TG.expand();if(TG&&TG.colorScheme==='dark')document.documentElement.classList.add('dark');}catch(e){}
+const PLAY='<svg viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></svg>',PAUSE='<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=s=>{s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+let D=null,P=null,V=null,T=null;const $=id=>document.getElementById(id);
+async function init(){try{const r=await fetch('intro.json',{cache:'no-store'});D=await r.json();}catch(e){D={};}
+ const app=$('app');if(!D.yt&&!D.src){app.innerHTML='<div class="err">Video hozircha qoʻyilmagan.</div>'+closeBtn();return;}
+ const cover=D.img||(D.yt?`https://i.ytimg.com/vi/${D.yt}/hqdefault.jpg`:'');
+ app.innerHTML=`<div class="brand"><span class="logo">ن</span>${esc(D.name||'NATIQ arabic')}</div>
+  <div class="vp ${D.tall?'tall':''}" id="vp">${D.yt?'<div class="vf"><div id="yf"></div></div>':`<video id="vd" src="${esc(D.src)}" playsinline preload="metadata" controlslist="nodownload"></video>`}
+   <div class="cov" style="${cover?`background-image:url('${esc(cover)}')`:''}"></div>
+   <div class="tapz" onclick="toggle()"><span class="pb">${PLAY}</span></div>
+   <div class="bar" onclick="event.stopPropagation()"><button id="pp" onclick="toggle()">${PLAY}</button><input id="rg" type="range" min="0" max="1000" value="0" oninput="seek(this.value)"><span class="tm" id="tm">0:00</span><button onclick="full()">⛶</button></div></div>
+  ${D.text?`<div class="txt">${esc(D.text)}</div>`:'<div style="height:18px"></div>'}${closeBtn()}`;
+ if(!D.yt){V=$('vd');V.addEventListener('play',()=>st(1));V.addEventListener('pause',()=>st(2));V.addEventListener('ended',()=>st(0));V.addEventListener('waiting',()=>$('vp').classList.add('loading'));V.addEventListener('playing',()=>$('vp').classList.remove('loading'));}}
+const closeBtn=()=>`<button class="btn" onclick="done()">➕ Qoʻshilish</button><p class="hint">Chatga qaytib, «➕ Qoʻshilish» tugmasini bosing</p>`;
+function done(){try{if(TG&&TG.close)return TG.close();}catch(e){}history.back();}
+function ytApi(){return new Promise(res=>{if(window.YT&&YT.Player)return res();window.onYouTubeIframeAPIReady=res;const s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';s.onerror=res;document.head.appendChild(s);setTimeout(res,10000);});}
+async function mk(){await ytApi();if(!window.YT||!YT.Player)return null;
+ return new Promise(res=>{const p=new YT.Player('yf',{videoId:D.yt,host:'https://www.youtube-nocookie.com',width:'100%',height:'100%',
+  playerVars:{controls:0,rel:0,modestbranding:1,playsinline:1,disablekb:1,fs:0,iv_load_policy:3,cc_load_policy:0,autoplay:1,origin:location.origin},
+  events:{onReady:()=>{P=p;res(p);try{p.playVideo();}catch(e){}},onStateChange:e=>st(e.data),onError:()=>{$('vp').classList.remove('loading');alertMsg();res(null);}}});setTimeout(()=>res(P),12000);});}
+function alertMsg(){const a=$('vp');if(a)a.insertAdjacentHTML('beforeend','<div class="err" style="position:absolute;inset:auto 0 40%;z-index:5;color:#fff">Video ochilmadi</div>');}
+function st(s){const b=$('vp');if(!b)return;b.classList.toggle('playing',s===1);if(s===1||s===2||s===3)b.classList.add('started');if(s===1)b.classList.remove('loading');$('pp').innerHTML=s===1?PAUSE:PLAY;
+ clearInterval(T);if(s===1)T=setInterval(tick,500);if(s===0&&P){try{P.seekTo(0,true);P.pauseVideo();}catch(e){}}}
+function tick(){let c=0,d=0;try{if(P){c=P.getCurrentTime()||0;d=P.getDuration()||0;}else if(V){c=V.currentTime;d=V.duration||0;}}catch(e){}
+ const r=$('rg');if(r)r.value=d?Math.round(c/d*1000):0;$('tm').textContent=fmt(c)+' / '+fmt(d);}
+async function toggle(){if(V){V.paused?V.play().catch(()=>{}):V.pause();return;}
+ if(!P){$('vp').classList.add('loading');await mk();return;}try{P.getPlayerState()===1?P.pauseVideo():P.playVideo();}catch(e){}}
+function seek(v){try{if(P)P.seekTo((P.getDuration()||0)*v/1000,true);else if(V&&V.duration)V.currentTime=V.duration*v/1000;}catch(e){}}
+function full(){const b=$('vp');const on=!b.classList.contains('fs');b.classList.toggle('fs',on);b.classList.toggle('rot',on&&!D.tall&&innerHeight>innerWidth);}
+init();
+</script>
+</body>
+</html>

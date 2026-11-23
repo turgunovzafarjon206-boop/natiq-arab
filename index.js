@@ -55,6 +55,7 @@ function createUserCache({ dir, store }) {
   }
   return { file };
 }
+const ytId = u => { const m = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/))([\w-]{11})/.exec(String(u || '')); return m ? m[1] : ''; };
 const MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', m4a: 'audio/mp4', mp3: 'audio/mpeg', ogg: 'audio/ogg', webm: 'audio/webm', wav: 'audio/wav', aac: 'audio/aac', mp4: 'video/mp4', mov: 'video/quicktime' };
 
 function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), info = () => ({}), store, big, media = null, ucache = null }) {
@@ -105,6 +106,13 @@ function createServer({ api, appHtml = () => fs.readFileSync(APP_FILE, 'utf8'), 
         res.writeHead(st, head); return fs.createReadStream(f, { start, end }).pipe(res);
       }
       if (req.method === 'GET' && m && MASCOTS.includes(m[1])) { const f = assetPath(`mascot-${m[1]}.${m[2]}`); if (f) return send(200, fs.readFileSync(f), { webp: 'image/webp', jpg: 'image/jpeg', png: 'image/png' }[m[2]], { 'Cache-Control': 'public, max-age=604800' }); }
+      /* referal tanishtiruv videosi (Mini App sahifasi): YouTube — oʻz pleerimizda, yoki MP4 / bot orqali yuklangan video */
+      if (req.method === 'GET' && p === '/intro') { const f = assetPath('intro.html'); if (f) return send(200, fs.readFileSync(f), 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache' }); }
+      if (req.method === 'GET' && p === '/intro.json' && api && api.cfg) {
+        const C = await api.cfg(); const v = String(C.refVideo || '').trim(); const yt = ytId(v); const mt = /^tg:(\d+)$/.exec(v);
+        const src = yt ? '' : mt ? '/m/' + mt[1] : /^https?:\/\//.test(v) ? v : '';
+        return send(200, JSON.stringify({ yt, src, tall: /shorts\//.test(v), img: C.refImg || '', name: C.appName || '', text: String(C.refText || '').slice(0, 1500) }), undefined, { 'Cache-Control': 'no-store' });
+      }
       /* «/» ham ilovani ochadi: BotFather’da domenning oʻzi yozilgan boʻlsa ham («Ochish» tugmasi) */
       if (req.method === 'GET' && (p === '/app' || p === '/')) return send(200, appHtml(), 'text/html; charset=utf-8', { 'Cache-Control': 'no-cache' });
       if (req.method === 'POST' && p.startsWith('/api/')) {

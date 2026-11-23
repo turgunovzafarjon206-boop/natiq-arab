@@ -16,6 +16,8 @@ boshqaruv esa natiq.uz → **Mini ilova** boʻlimida.
 | `store.js` | Supabase bilan ishlash |
 | `mtproto.js` | Katta fayllar (20 MB+) — Telegramdan oqim |
 | `app.html` | Mini App (oʻquvchi koʻradigan ilova) |
+| `intro.html` | Referal tanishtiruv videosi sahifasi (`/intro`): YouTube havolasi oʻz pleerimizda, YouTube belgilarisiz |
+| `sched-default.js` | Tayyor 30 ta kunlik xabar (rejalashtirilgan xabarlar sozlanmagan boʻlsa — avtomatik joylanadi) |
 | `mascot-*.webp`, `mascot-*.jpg` | Natiq boyqushi (maskot): ilova uchun webp, Telegram uchun jpg — shu papkada turishi shart |
 | `test.js` | Sinovlar: `npm test` |
 
@@ -89,3 +91,10 @@ kartaga toʻlaydi va chek rasmini yuklaydi → saytda «💳 Toʻlovlar» → Ta
 - Oʻquvchilar yuklagan rasm/ovoz «arab/soc/» papkasida turadi va ilovaga server orqali (`/u/…`, diskda kesh) beriladi — Supabase trafigi tejaladi.
 
 `app.html` qismlardan yigʻiladi: `cat parts/a_head.html parts/b_core.js parts/c_lesson.js parts/d_garden.js parts/e_profile.js parts/f_social.js parts/z_end.html > app.html`
+
+## yangilar39
+- **Referal tanishtiruv videosi — YouTube havolasi**: Telegram YouTube’ni video qilib yubora olmaydi, shuning uchun bot muqova rasmi + «▶️ Videoni koʻrish» tugmasini yuboradi → video ilova ichida (`/intro`) oʻz pleerimizda, YouTube belgilarisiz ochiladi. MP4 fayl yoki `tg:12` boʻlsa — avvalgidek toʻgʻridan-toʻgʻri video. Muqova: saytda «Referal» → «Muqova rasmi».
+- **Rejalashtirilgan xabarlar**: hali sozlanmagan boʻlsa — tayyor 30 ta xabar avtomatik joylanadi va yoqiladi (19:30). Bir necha vaqt mumkin (`08:30, 19:30`). Oxiriga yetgach — boshidan takrorlanadi. Saytda «📥 Tayyor 30 ta xabar» tugmasi.
+- **Reels — YouTube havolasi**: koʻrinishga kirganda avtomatik oʻynaydi, pauza/oxirida YouTube oynalari (boshqa videolar, sarlavha) muqova bilan yopiladi, ovoz tugmasi, ingichka progress chizigʻi.
+- **Reyting**: ismlar koʻrinmay qolgan edi (reels bilan CSS klassi toʻqnashgan) — tuzatildi.
+- **Profil izohlari**: oʻquvchi profilida «📝 Izohlar» — boshqa oʻquvchilar va admin (saytda ID kodlar → 📝) yozadi; profil egasiga bildirishnoma; egasi istalganini, muallif oʻzinikini oʻchiradi. Moderatsiyada «Profil izohlari» filtri.

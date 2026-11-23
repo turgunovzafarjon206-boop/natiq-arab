@@ -251,7 +251,7 @@ async function botTests(store) {
   {
     const path = require('path'); const fs = require('fs');
     const clock = () => new Date('2026-11-12T07:00:00Z');   // Toshkent 12:00
-    const B = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app', clock, asset: f => { const x = path.join(__dirname, f); return fs.existsSync(x) ? x : null; },
+    const B = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app', clock, asset: f => [path.join(__dirname, f), path.join(__dirname, '..', 'public', f)].find(x => fs.existsSync(x)) || null,
       botOpts: { botInfo: { id: 7, is_bot: true, first_name: 'N', username: 'natiq_arab_bot', can_join_groups: false, can_read_all_group_messages: false, supports_inline_queries: false } } });
     const C2 = []; B.bot.api.config.use(async (prev, method, payload) => { C2.push({ method, payload }); return { ok: true, result: { message_id: 1, date: 0, chat: { id: 1, type: 'private' }, photo: [{ file_id: 'F1', width: 1, height: 1, file_unique_id: 'u' }] } }; });
     await store.patch('ar_prog', 'A7K3P9', { lastDay: '2026-11-10' });     // 1 kun oʻtdi
@@ -635,6 +635,85 @@ async function refBotTests() {
   await A.bot.handleUpdate(cmd(user(701, 'T'), '/start ppst123456_' + pid('RAAAA1')));
   ok('ulashilgan post: «Ilovada ochish» tugmasi', /Mening postim/.test(last().payload.text) && last().payload.reply_markup.inline_keyboard[0][0].web_app.url.includes('post=pst123456'), last());
 }
+async function v39Tests() {
+  console.log('v39: profil izohlari, tayyor kunlik xabarlar (bir necha vaqt), YouTube tanishtiruv, reyting');
+  const S = seed(); const tnow = { t: new Date('2026-11-23T05:00:00Z') };
+  const store = new MemoryStore({ ar_cfg: [{ id: 'main' }], ar_letters: S.ar_letters,
+    ar_codes: [{ id: 'WAAAA1', name: 'Aziz', status: 'active', tgId: 901 }, { id: 'WBBBB2', name: 'Bobur', status: 'active', tgId: 902 }, { id: 'WCCCC3', name: 'Sardor', status: 'active', tgId: 903 }],
+    ar_tg: [{ id: '901', code: 'WAAAA1' }, { id: '902', code: 'WBBBB2' }, { id: '903', code: 'WCCCC3' }] });
+  const notes = [];
+  const api = createApi({ store, token: TOKEN, clock: () => tnow.t, onNotify: async (c, t) => notes.push([c, t]), botUser: () => 'natiq_arab_bot' });
+  const I = id => signInitData({ id, first_name: 'U' + id }, TOKEN);
+  const call = (n, b, id) => api.handle(n, Object.assign({ initData: I(id) }, b || {}));
+  for (const id of [901, 902, 903]) await call('me', {}, id);
+  const pidA = (await call('profile', { me: true }, 901)).body.pid;
+  // profil izohlari
+  let r = await call('wallAdd', { pid: pidA, text: 'Aziz — zoʻr oʻquvchi! 👏' }, 902); ok('boshqa oʻquvchi profilga izoh yozdi', r.status === 200 && r.body.items.length === 1 && r.body.items[0].name === 'Bobur' && r.body.items[0].mine, r.body);
+  const w1 = r.body.items[0].id;
+  r = await call('wallAdd', { pid: pidA, text: '' }, 903); ok('boʻsh izoh — 400', r.status === 400);
+  r = await call('wallAdd', { pid: pidA, text: 'Men ham qoʻshilaman' }, 903); const w2 = r.body.items[0].id;
+  r = await call('profile', { pid: pidA }, 903); ok('profilda izohlar (yangisi tepada)', r.body.wall.length === 2 && r.body.wall[0].text === 'Men ham qoʻshilaman' && r.body.wallOn === true && r.body.wall[1].canDel === false, r.body.wall);
+  await new Promise(res => setTimeout(res, 60));
+  r = await call('notes', { read: false }, 901); ok('profil egasiga bildirishnoma', r.body.items.filter(n => n.t === 'wall').length === 2 && r.body.items.some(n => n.name === 'Bobur'), r.body.items);
+  r = await call('wallDel', { id: w1 }, 903); ok('begona izohni oʻchirib boʻlmaydi', r.status === 403);
+  r = await call('wallDel', { id: w2 }, 903); ok('muallif oʻz izohini oʻchiradi', r.status === 200 && r.body.items.length === 1, r.body);
+  r = await call('wallDel', { id: w1 }, 901); ok('profil egasi istalgan izohni oʻchiradi', r.status === 200 && r.body.items.length === 0, r.body);
+  r = await call('wallAdd', { text: 'Bugun 5-darsni tugatdim' }, 901); ok('oʻz profiliga yozish (bildirishnomasiz)', r.status === 200 && r.body.items[0].canDel, r.body);
+  // admin (saytdan) izohi
+  await store.put('ar_posts', 'wadm', { kind: 'wall', admin: true, to: 'WAAAA1', code: '', name: 'Admin', text: 'Barakalla, davom eting!', at: tnow.t.toISOString() });
+  await store.put('ar_ops', 'opw', { code: 'WAAAA1', type: 'wall', n: 0, status: 'pending', at: tnow.t.toISOString(), byName: 'Admin', text: 'Barakalla, davom eting!', msg: '📝 Admin profilingizga izoh qoldirdi' });
+  await api.lock('WAAAA1', () => api.applyOps('WAAAA1'));
+  const P0 = await api.social.posts(); P0.set('wadm', Object.assign({ id: 'wadm' }, await store.get('ar_posts', 'wadm')));   // sayt yozgan postni kesh 15 soniyada koʻradi — sinovda darhol
+  r = await call('profile', { pid: pidA }, 902); const adm = r.body.wall.find(x => x.admin);
+  ok('admin izohi «Admin» belgisi bilan', adm && adm.name === 'Admin' && !adm.pid && adm.canDel === false, r.body.wall);
+  r = await call('notes', {}, 901); ok('admin izohi: ilova bildirishnomasi + bot xabari', r.body.items.some(n => n.t === 'wall' && n.admin) && notes.some(n => n[0] === 'WAAAA1' && /Admin profilingizga/.test(n[1])), { n: r.body.items, notes });
+  await store.put('ar_cfg', 'main', { id: 'main', wallOn: false }); api.drop && api.drop();
+  tnow.t = new Date(tnow.t.getTime() + 60000);
+  // reyting: ismlar
+  r = await call('rating', {}, 901); ok('reyting: ismlar bor', r.body.top.length === 3 && r.body.top.every(x => ['Aziz', 'Bobur', 'Sardor'].includes(x.name)), r.body.top);
+  // tayyor kunlik xabarlar: hali sozlanmagan — avtomatik joylanadi va yoqiladi
+  tnow.t = new Date('2026-11-23T05:00:00Z'); await api.social.tick();
+  let sc = await store.get('ar_cfg', 'sched'); ok('tayyor 30 ta xabar avtomatik joylandi va yoqildi', sc && sc.on === true && sc.items.length === 30 && sc.time === '19:30' && sc.seeded, sc && { on: sc.on, n: sc.items.length, t: sc.time });
+  ok('vaqti kelmagan — yuborilmaydi', !(await store.list('ar_msgs')).some(m => m.auto === 'sched'));
+  tnow.t = new Date('2026-11-23T14:31:00Z'); await api.social.tick(); await api.social.tick();
+  let sm = (await store.list('ar_msgs')).filter(m => m.auto === 'sched'); ok('19:30 da 1-xabar (bir marta)', sm.length === 1 && /28 ta harf/.test(sm[0].text) && sm[0].btn === true, sm.map(m => m.text.slice(0, 30)));
+  // bir necha vaqt + aylanib takrorlanish
+  await store.put('ar_cfg', 'sched', { on: true, time: '08:30, 19:30', items: [{ text: 'A' }, { text: 'B' }, { text: 'C' }], idx: 0, seeded: 'x' });
+  for (const t of ['2026-11-24T03:31:00Z', '2026-11-24T03:40:00Z', '2026-11-24T14:31:00Z', '2026-11-25T03:31:00Z', '2026-11-25T14:31:00Z']) { tnow.t = new Date(t); await api.social.tick(); }
+  sm = (await store.list('ar_msgs')).filter(m => m.auto === 'sched').sort((a, b) => a.at.localeCompare(b.at)).map(m => m.text).slice(1);
+  ok('kuniga 2 marta (08:30, 19:30), oxiridan keyin boshidan', sm.join('|') === 'A|B|C|A', sm);
+  sc = await store.get('ar_cfg', 'sched'); ok('toʻliq aylanishlar soni', sc.rounds === 1 && sc.lastKey === '2026-11-25 19:30', sc);
+  tnow.t = new Date('2026-11-27T14:00:00Z'); await api.social.tick();
+  sm = (await store.list('ar_msgs')).filter(m => m.auto === 'sched'); ok('oʻtkazib yuborilgan vaqtlar yigʻilib ketmaydi (faqat bittasi)', sm.length === 6, sm.length);
+  await store.put('ar_cfg', 'sched', Object.assign(await store.get('ar_cfg', 'sched'), { items: [] }));
+  await api.social.tick(); ok('admin oʻzi tozalagan boʻlsa — qayta joylanmaydi', (await store.get('ar_cfg', 'sched')).items.length === 0);
+  await api.flush();
+
+  // YouTube tanishtiruv videosi: muqova + «▶️ Videoni koʻrish» (Mini App) + «Qoʻshilish»
+  const crypto = require('crypto'); const pid = code => crypto.createHmac('sha256', TOKEN).update('pid:' + code).digest('hex').slice(0, 12);
+  const st2 = new MemoryStore({ ar_cfg: [{ id: 'main', refVideo: 'https://youtu.be/dQw4w9WgXcQ', refText: 'Tanishing!' }], ar_codes: [{ id: 'RAAAA1', name: 'T', status: 'active', tgId: 701 }], ar_tg: [{ id: '701', code: 'RAAAA1' }] });
+  const calls = []; const A = createArArabBot(st2, calls); let u = 1;
+  const F = { id: 811, is_bot: false, first_name: 'Doʻst' }; const t0 = '/start r_' + pid('RAAAA1');
+  await A.bot.handleUpdate({ update_id: u++, message: { message_id: 1, date: 0, chat: { id: 811, type: 'private' }, from: F, text: t0, entities: [{ type: 'bot_command', offset: 0, length: 6 }] } });
+  const lc = calls.filter(c => /^send/.test(c.method)).pop();
+  ok('YouTube: sendVideo emas — muqova + «▶️ Videoni koʻrish» + «Qoʻshilish»', lc && lc.method === 'sendPhoto' && /maxresdefault/.test(lc.payload.photo) && lc.payload.reply_markup.inline_keyboard[0][0].web_app.url === 'https://arab.example/intro' && lc.payload.reply_markup.inline_keyboard[1][0].callback_data === 'rj' && !calls.some(c => c.method === 'sendVideo'), lc);
+  // /intro sahifasi va intro.json
+  const api2 = createApi({ store: st2, token: TOKEN });
+  const srv = createServer({ api: api2, store: st2 }); await new Promise(r => srv.listen(0, r)); const port = srv.address().port;
+  const get = path => new Promise((res, rej) => http.get({ port, path }, rs => { let b = ''; rs.on('data', d => b += d); rs.on('end', () => res({ st: rs.statusCode, b, type: rs.headers['content-type'] })); }).on('error', rej));
+  let g = await get('/intro'); ok('/intro — pleer sahifasi', g.st === 200 && /text\/html/.test(g.type) && /youtube-nocookie/.test(g.b) && /Qoʻshilish/.test(g.b), g.st);
+  g = await get('/intro.json'); let j = JSON.parse(g.b); ok('/intro.json — YouTube ID (havolasiz), matn', j.yt === 'dQw4w9WgXcQ' && !j.src && j.text === 'Tanishing!' && !/youtu/.test(JSON.stringify({ ...j, yt: '' })), j);
+  srv.close();
+  await st2.put('ar_cfg', 'main', { id: 'main', refVideo: 'tg:12' });
+  const srv2 = createServer({ api: createApi({ store: st2, token: TOKEN }), store: st2 }); await new Promise(r => srv2.listen(0, r));
+  g = await new Promise((res, rej) => http.get({ port: srv2.address().port, path: '/intro.json' }, rs => { let b = ''; rs.on('data', d => b += d); rs.on('end', () => res({ b })); }).on('error', rej));
+  j = JSON.parse(g.b); ok('/intro.json — bot orqali yuklangan video (/m/12)', j.src === '/m/12' && !j.yt, j); srv2.close();
+  // ilova: reyting roʻyxati reels klassi bilan toʻqnashmaydi
+  const fs0 = require('fs'), pth = require('path'); const html = fs0.readFileSync([pth.join(__dirname, 'app.html'), pth.join(__dirname, '..', 'public', 'app.html')].find(f => fs0.existsSync(f)), 'utf8');
+  ok('app.html: reyting (.rl) va reels (.rlx) klasslari ajratildi', /\.rl\{display:flex;flex-direction:column/.test(html) && !/\.rl\{position:relative/.test(html) && /class="rlx"/.test(html), '');
+  ok('app.html: profil izohlari va YouTube reels avtomatik', /function wallBlock/.test(html) && /function ytAuto/.test(html) && /ytprog/.test(html), '');
+}
+
 function createArArabBot(store, calls) {
   const A = createArabBot({ token: TOKEN, store, appUrl: 'https://arab.example/app', fetchImpl: async () => ({ ok: true, arrayBuffer: async () => new Uint8Array(500).buffer }),
     botOpts: { botInfo: { id: 7, is_bot: true, first_name: 'N', username: 'natiq_arab_bot', can_join_groups: false, can_read_all_group_messages: false, supports_inline_queries: false } } });
@@ -654,6 +733,7 @@ function createArArabBot(store, calls) {
   await courseSocialPayTests();
   await socialTests();
   await refBotTests();
+  await v39Tests();
   console.log(fails ? `\n❌ ${fails} ta sinov oʻtmadi` : '\n✅ Barcha sinovlar oʻtdi');
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

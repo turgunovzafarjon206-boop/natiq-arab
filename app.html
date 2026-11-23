@@ -461,7 +461,7 @@ body.commmode .nav{display:none}body.commmode #app{padding-bottom:0}
 body.reelmode #app{padding-bottom:0}body.reelmode{overflow:hidden}
 .reels{height:calc(100dvh - 64px - var(--nav) - env(safe-area-inset-bottom));overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;background:#000}
 .reels::-webkit-scrollbar{display:none}
-.rl{position:relative;height:100%;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;background:#000;color:#fff;display:flex;align-items:center;justify-content:center}
+.rlx{position:relative;height:100%;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden;background:#000;color:#fff;display:flex;align-items:center;justify-content:center}
 .rv,.ri{width:100%;height:100%;object-fit:contain;position:relative;z-index:1}.rbg{position:absolute;inset:-20px;background-size:cover;background-position:center;filter:blur(24px) brightness(.55)}
 .rtx{position:relative;z-index:1;padding:24px;text-align:center;width:100%}.rtx.big{height:100%;display:flex;align-items:center;justify-content:center}.rtx.big p{font-size:24px;font-weight:900;line-height:1.35;text-shadow:0 2px 8px rgba(0,0,0,.25);overflow-wrap:anywhere}
 .rtx .aud audio{max-width:300px}.raud{position:absolute;left:12px;right:80px;bottom:110px;z-index:3}
@@ -471,13 +471,16 @@ body.reelmode #app{padding-bottom:0}body.reelmode{overflow:hidden}
 .ra{position:absolute;right:8px;bottom:24px;z-index:4;display:flex;flex-direction:column;gap:14px}
 .ra button{display:flex;flex-direction:column;align-items:center;gap:2px;color:#fff;font-weight:800;font-size:12px;text-shadow:0 1px 4px rgba(0,0,0,.6)}
 .ra button span{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.16);backdrop-filter:blur(6px);display:grid;place-items:center;font-size:24px}.ra button:disabled{opacity:.6}
-.rl .ytb{width:100%;aspect-ratio:auto;height:100%;border-radius:0;z-index:1}
+.rlx .ytb{width:100%;aspect-ratio:auto;height:100%;border-radius:0;z-index:1}
+.ytb.reel .ytbar{display:none}.ytprog{display:none}.ytb.reel .ytprog{display:block;position:absolute;left:0;right:0;bottom:0;height:3px;z-index:3;background:rgba(255,255,255,.25)}.ytb.reel .ytprog i{display:block;height:100%;width:0;background:var(--gold)}
+.ytb.reel .ytpb{opacity:0}.ytb.reel:not(.started) .ytpb,.ytb.reel.started:not(.playing):not(.loading) .ytpb{opacity:1}
 /* youtube — oʻz pleerimiz */
 .ytb{position:relative;width:100%;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#000;user-select:none;-webkit-user-select:none}
 .ytf{position:absolute;inset:0;overflow:hidden;pointer-events:none}.ytf iframe,.ytf>div{position:absolute;left:0;top:-60px;width:100%!important;height:calc(100% + 120px)!important;border:0}
 .ytc{position:absolute;inset:0;z-index:2;display:grid;place-items:center;cursor:pointer}
 .ytcov{position:absolute;inset:0;background-size:cover;background-position:center;transition:opacity .25s}
-.ytb.started .ytcov{background-image:none!important;background:#000;opacity:.88}.ytb.playing .ytcov{opacity:0}
+.ytb.started .ytcov{opacity:1}.ytb.started .ytcov::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.45)}.ytb.playing .ytcov{opacity:0}
+.ytb.yterr .ytpb{display:none}.ytb.yterr .ytc::after{content:'Video ochilmadi';position:absolute;color:#fff;font-weight:800;font-size:15px}
 .ytpb{position:relative;width:74px;height:74px;border-radius:50%;background:rgba(0,0,0,.55);border:3px solid #fff;display:grid;place-items:center;color:#fff;transition:opacity .2s}
 .ytpb svg{width:32px;height:32px;margin-left:4px}.ytb.playing .ytpb{opacity:0}.ytb.loading .ytpb{animation:pulse .8s infinite}
 .ytbar{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;gap:8px;padding:6px 10px 8px;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;opacity:0;transition:opacity .2s;pointer-events:none}
@@ -486,6 +489,12 @@ body.reelmode #app{padding-bottom:0}body.reelmode{overflow:hidden}
 .ytb.fs{position:fixed;inset:0;z-index:300;border-radius:0;aspect-ratio:auto;width:100vw;height:100vh}
 .ytb.fs.rot{width:100vh;height:100vw;top:50%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%) rotate(90deg)}
 body.ytfs{overflow:hidden}
+/* profil izohlari */
+.wallc{padding:12px;margin-bottom:18px}.wadd{display:flex;gap:8px;align-items:flex-end}.wadd textarea{flex:1;min-height:46px;resize:none;padding:10px 12px;font:inherit;font-size:14.5px}.wadd .btn{width:auto;padding:0 16px;min-height:46px}
+.wl{display:flex;flex-direction:column;margin-top:10px}.wr{display:flex;gap:10px;align-items:flex-start;padding:10px 2px;border-top:2px solid var(--line)}.wr:first-child{border-top:0}
+.wr.adm{background:var(--gold-l);border-radius:14px;padding:10px;border-top:0;margin:4px 0}:root.dark .wr.adm{background:#2C2410}
+.wh{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.wh b{font-size:14.5px;cursor:pointer}.wh small{font-size:12px;color:var(--mut);font-weight:700}.wt{font-size:14.5px;line-height:1.45;overflow-wrap:anywhere;margin-top:2px}
+.wdel{opacity:.55;font-size:16px;padding:4px}
 /* bildirishnoma, referal, bellashuv */
 .nt-row{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-top:2px solid var(--line);width:100%;text-align:left;font-size:14.5px;line-height:1.4}.nt-row:first-child{border-top:0}
 .nt-row small{display:block;font-size:12px;color:var(--mut);font-weight:700;margin-top:2px}.nic{font-size:24px;width:32px;text-align:center;flex:none}
@@ -548,7 +557,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 let ME=null,TAB='learn',SUB=null,LANG='uz',SESS=null,RATING=null,MARKET=null,ORDERS=null,NAV=[],USERP=null,FOLL=null,BUY=null;
 
 /* ---------- tillar: lotin (asosiy), kirill (avtomatik), rus ---------- */
-const RU={'Darslar':'Уроки','Reyting':'Рейтинг','Bogʻ':'Сад','Profil':'Профиль','Boshlash':'Начать','harf':'буква','Video dars':'Видеоурок','Qoidalar':'Правила','Talaffuz':'Произношение',
+const RU={'Yuborish':'Отправить','Izohlar':'Комментарии','Izoh yozing…':'Напишите комментарий…','Oʻzingiz haqida yozing…':'Напишите о себе…','Hali izoh yoʻq':'Пока нет комментариев','Izoh oʻchirilsinmi?':'Удалить комментарий?','profilingizga izoh yozdi':'оставил(а) комментарий в вашем профиле','Admin':'Админ','Darslar':'Уроки','Reyting':'Рейтинг','Bogʻ':'Сад','Profil':'Профиль','Boshlash':'Начать','harf':'буква','Video dars':'Видеоурок','Qoidalar':'Правила','Talaffuz':'Произношение',
 'Yakuniy test':'Итоговый тест','Lugʻat':'Словарь','Davom etish':'Продолжить','Tekshirish':'Проверить','Barakalla!':'Отлично!','Toʻgʻri javob:':'Правильный ответ:','Notoʻgʻri':'Неверно',
 'Koʻrdim':'Посмотрел','Tushundim':'Понятно','Keyingi':'Далее','Testni boshlash':'Начать тест','Jonlar tugadi':'Жизни закончились',
 'Bu bosqich uchun dinor berilmadi.':'За этот этап динары не начислены.','Takrorlash — jon olish':'Повторение — получить жизни','Darslarga qaytish':'Вернуться к урокам',
@@ -1128,8 +1137,20 @@ function userView(){const U=USERP||{};let h=`<div class="wrap">${backS()}`;
  h+=d.items.length?`<div class="mgrid">${d.items.map(x=>`<div class="prod"><div class="im" style="${x.img?`background-image:url('${esc(x.img)}')`:''}">${x.img?'':stk('gift')}</div><div class="pi"><div class="pn">${esc(x.name)}</div><div class="muted" style="font-size:12px">${esc(String(x.at).split('-').reverse().join('.'))}</div></div></div>`).join('')}</div>`
   :`<p class="muted" style="text-align:center;margin:6px 0 20px">${T('Hali buyum sotib olmagan')}</p>`;
  if(d.medals)h+=`<h3 class="sec">🏅 ${T('Unvonlar')}${d.vstreak?` · 🔥 ${d.vstreak}`:''}</h3>${medalsRow(d.medals)}`;
+ h+=wallBlock(d);
  h+=`<div id="psec">${postsBlock(d)}</div>`;
  return h+`</div>`;}
+/* ---------- 📝 profil izohlari: admin (saytdan) va boshqa oʻquvchilar yozadi ---------- */
+function wallBlock(d){const L=d.wall||[];if(d.wallOn===false&&!L.length)return '';
+ return `<h3 class="sec">📝 ${T('Izohlar')}${L.length?` · ${L.length}`:''}</h3><div class="card wallc">
+  ${d.wallOn!==false?`<div class="wadd"><textarea id="wtx" class="inp" rows="2" maxlength="500" placeholder="${d.me?T('Oʻzingiz haqida yozing…'):T('Izoh yozing…')}"></textarea><button class="btn sm" id="wbtn" onclick="wallAdd('${d.pid}')">${T('Yuborish')}</button></div>`:''}
+  ${L.length?`<div class="wl">${L.map(x=>wallRow(x,d.pid)).join('')}</div>`:`<p class="muted" style="text-align:center;margin:10px 0 4px">${T('Hali izoh yoʻq')}</p>`}</div>`;}
+function wallRow(x,pid){return `<div class="wr ${x.admin?'adm':''}">${x.admin?`<span class="av sm" style="background:var(--gold)">N</span>`:`<button class="av sm" style="background:${avCol(x.name)}" onclick="openProfile('${x.pid}')">${esc(ini(x.name))}</button>`}
+ <div class="grow" style="min-width:0"><div class="wh"><b ${x.pid?`onclick="openProfile('${x.pid}')"`:''}>${esc(x.name)}</b>${x.admin?`<span class="rbadge">${T('Admin')}</span>`:''}<small>${ago(x.at)}</small></div><div class="wt">${txtH(x.text)}</div></div>
+ ${x.canDel?`<button class="wdel" onclick="wallDel('${x.id}')" aria-label="del">🗑</button>`:''}</div>`;}
+async function wallAdd(pid){const t=$('wtx');const v=t&&t.value.trim();if(!v)return;const b=$('wbtn');b.disabled=true;
+ try{const r=await api('wallAdd',{pid,text:v});if(USERP&&USERP.d)USERP.d.wall=r.items;hap('ok');sfx('ok');render();}catch(e){b.disabled=false;toast(e.message);}}
+async function wallDel(id){if(!await askOk(T('Izoh oʻchirilsinmi?')))return;try{const r=await api('wallDel',{id});if(USERP&&USERP.d)USERP.d.wall=r.items;render();}catch(e){toast(e.message);}}
 async function toggleFollow(pid){const d=USERP&&USERP.d;if(!d)return;const b=$('fbtn');if(b)b.disabled=true;
  try{const r=await api('follow',{pid,on:!d.iFollow});d.iFollow=r.iFollow;d.followers=r.followers;hap(r.iFollow?'ok':'light');if(r.iFollow)sfx('ok');render();}catch(e){if(b)b.disabled=false;toast(e.message);}}
 /* obunachilar / obunalar roʻyxati (qidiruv bilan) */
@@ -1355,7 +1376,7 @@ function reelsView(){const R=REELS;if(!R){loadReels();return `<div class="reels"
  return `<div class="reels" id="reels">${R.items.map(reelCard).join('')}</div>`;}
 function reelActs(x){return `<button class="${x.liked?'on':''}" ${x.mine?'disabled':''} onclick="likeP('${x.id}')"><span>${x.liked?'❤️':'🤍'}</span><b>${fmt(x.likes)}</b></button>
  <button onclick="openCmts('${x.id}')"><span>💬</span><b>${fmt(x.cn)}</b></button><button onclick="shareP('${x.id}')"><span>↗️</span><b>${T('Ulashish')}</b></button>
- ${x.video?`<button onclick="reelMute()"><span>${RL_MUTE?'🔇':'🔊'}</span></button>`:''}`;}
+ ${x.video||x.yt?`<button onclick="reelMute()"><span>${RL_MUTE?'🔇':'🔊'}</span></button>`:''}`;}
 function reelCard(x){let m='';
  if(x.yt)m=ytBox(x.yt,'reel');
  else if(x.video)m=`<video class="rv" src="${esc(x.video)}" playsinline loop ${RL_MUTE?'muted':''} preload="metadata" onclick="reelTap(this)"></video>`;
@@ -1363,16 +1384,16 @@ function reelCard(x){let m='';
  else if(x.audio)m=`<div class="rtx">${MS('read','','width:150px;height:150px;margin:0 auto 10px')}${audH(x.audio,x.dur)}</div>`;
  else m=`<div class="rtx big" style="background:linear-gradient(160deg,${avCol(x.id)},${avCol(x.name+'x')})"><p>${txtH(x.text)}</p></div>`;
  const showTx=x.text&&(x.img||x.video||x.yt||x.audio);
- return `<section class="rl" id="rl-${x.id}" data-id="${x.id}">${m}${x.audio&&(x.img)?`<div class="raud">${audH(x.audio,x.dur)}</div>`:''}
+ return `<section class="rlx" id="rl-${x.id}" data-id="${x.id}">${m}${x.audio&&(x.img)?`<div class="raud">${audH(x.audio,x.dur)}</div>`:''}
   <div class="rinfo"><div class="rau">${x.admin?`<span class="av sm" style="background:var(--gold)">N</span>`:avS(x.name,x.pid)}<b>${esc(x.name)}</b>${x.admin?'<span class="rbadge">Natiq</span>':''}</div>${showTx?`<div class="rcap" onclick="this.classList.toggle('open')">${txtH(x.text)}</div>`:''}</div>
   <div class="ra">${reelActs(x)}</div></section>`;}
 function reelTap(v){if(v.paused)v.play().catch(()=>{});else v.pause();}
-function reelMute(){RL_MUTE=!RL_MUTE;document.querySelectorAll('#reels video').forEach(v=>{v.muted=RL_MUTE;});document.querySelectorAll('#reels .ra').forEach(a=>{const s=a.closest('.rl');const x=REELS.items.find(i=>i.id===s.dataset.id);if(x){a.innerHTML=reelActs(x);}});}
+function reelMute(){RL_MUTE=!RL_MUTE;document.querySelectorAll('#reels video').forEach(v=>{v.muted=RL_MUTE;});document.querySelectorAll('#reels .ytb').forEach(b=>ytMuteSet(b.id));document.querySelectorAll('#reels .ra').forEach(a=>{const s=a.closest('.rlx');const x=REELS.items.find(i=>i.id===s.dataset.id);if(x){a.innerHTML=reelActs(x);}});}
 function reelObserve(){if(!('IntersectionObserver' in window))return;if(RL_IO)RL_IO.disconnect();
  RL_IO=new IntersectionObserver(es=>es.forEach(e=>{const s=e.target;const v=s.querySelector('video');
-   if(e.isIntersecting&&e.intersectionRatio>.6){if(v){v.muted=RL_MUTE;v.play().catch(()=>{});}const L=[...document.querySelectorAll('#reels .rl')];if(L.indexOf(s)>=L.length-2&&!REELS.busy)loadReels(true);}
+   if(e.isIntersecting&&e.intersectionRatio>.6){if(v){v.muted=RL_MUTE;v.play().catch(()=>{});}const yb=s.querySelector('.ytb');if(yb)ytAuto(yb.id);const L=[...document.querySelectorAll('#reels .rlx')];if(L.indexOf(s)>=L.length-2&&!REELS.busy)loadReels(true);}
    else{if(v)v.pause();const y=s.querySelector('.ytb');if(y)ytPause(y.id);}}),{threshold:[0,.6,1]});
- document.querySelectorAll('#reels .rl').forEach(s=>RL_IO.observe(s));}
+ document.querySelectorAll('#reels .rlx').forEach(s=>RL_IO.observe(s));}
 
 /* ---------- 🎥 YouTube — saytga yuklangandek: YouTube belgilari koʻrinmaydi, oʻz boshqaruv tugmalari ---------- */
 let YTP={},YTN=0,YTAPI=null;
@@ -1381,19 +1402,23 @@ function ytApi(){if(window.YT&&YT.Player)return Promise.resolve();if(YTAPI)retur
 function ytBox(id,cls){const n='ytb'+(++YTN);
  return `<div class="ytb ${cls||''}" id="${n}" data-yt="${esc(id)}"><div class="ytf"><div id="${n}-f"></div></div>
   <div class="ytc" onclick="ytToggle('${n}')"><div class="ytcov" style="background-image:url('https://i.ytimg.com/vi/${esc(id)}/hqdefault.jpg')"></div><span class="ytpb">${IC.play}</span></div>
-  <div class="ytbar" onclick="event.stopPropagation()"><button onclick="ytToggle('${n}')" class="ytpp">${IC.play}</button><input type="range" min="0" max="1000" value="0" oninput="ytSeek('${n}',this.value)"><span class="ytt">0:00</span><button onclick="ytFull('${n}')" class="ytfs">⛶</button></div></div>`;}
+  <div class="ytbar" onclick="event.stopPropagation()"><button onclick="ytToggle('${n}')" class="ytpp">${IC.play}</button><input type="range" min="0" max="1000" value="0" oninput="ytSeek('${n}',this.value)"><span class="ytt">0:00</span><button onclick="ytFull('${n}')" class="ytfs">⛶</button></div><div class="ytprog"><i></i></div></div>`;}
 const ytFmt=s=>{s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
 function ytInitAll(){document.querySelectorAll('.ytb:not([data-ok])').forEach(b=>{b.dataset.ok=1;});}
 async function ytMake(n){const b=$(n);if(!b)return null;if(YTP[n])return YTP[n];await ytApi();if(!window.YT||!YT.Player){toast(T('Video yuklanmadi'));return null;}
  return new Promise(res=>{const p=new YT.Player(n+'-f',{videoId:b.dataset.yt,host:'https://www.youtube-nocookie.com',width:'100%',height:'100%',
    playerVars:{controls:0,rel:0,modestbranding:1,playsinline:1,disablekb:1,fs:0,iv_load_policy:3,cc_load_policy:0,showinfo:0,autoplay:1,origin:location.origin},
-   events:{onReady:()=>{YTP[n]=p;res(p);try{p.playVideo();}catch(e){}},onStateChange:e=>ytState(n,e.data)}});setTimeout(()=>res(YTP[n]||null),12000);});}
-function ytState(n,s){const b=$(n);if(!b)return;b.classList.toggle('playing',s===1);b.classList.toggle('ended',s===0);b.classList.toggle('started',s===1||s===2||s===3||b.classList.contains('started'));
+   events:{onReady:()=>{YTP[n]=p;res(p);ytMuteSet(n);try{p.playVideo();}catch(e){}},onStateChange:e=>ytState(n,e.data),onError:()=>{b.classList.remove('loading');b.classList.add('yterr');res(null);}}});setTimeout(()=>res(YTP[n]||null),12000);});}
+function ytState(n,s){const b=$(n);if(!b)return;if(s===0&&b.classList.contains('reel')){const p=YTP[n];try{p.seekTo(0,true);p.playVideo();}catch(e){}return;}b.classList.toggle('loading',s===3);b.classList.toggle('playing',s===1);b.classList.toggle('ended',s===0);b.classList.toggle('started',s===1||s===2||s===3||b.classList.contains('started'));
  const pp=b.querySelector('.ytpp');if(pp)pp.innerHTML=s===1?IC.stop:IC.play;clearInterval(b._t);
  if(s===1)b._t=setInterval(()=>{const p=YTP[n];if(!p||!$(n)){clearInterval(b._t);return;}try{const d=p.getDuration()||0,c=p.getCurrentTime()||0;const r=b.querySelector('input');if(r&&!r._drag)r.value=d?Math.round(c/d*1000):0;
-  const t=b.querySelector('.ytt');if(t)t.textContent=ytFmt(c)+' / '+ytFmt(d);b._played=(b._played||0)+.5;if(typeof onYtTick==='function')onYtTick(n,b._played,c,d);}catch(e){}},500);}
+  const t=b.querySelector('.ytt');if(t)t.textContent=ytFmt(c)+' / '+ytFmt(d);const g=b.querySelector('.ytprog i');if(g)g.style.width=(d?c/d*100:0)+'%';b._played=(b._played||0)+.5;if(typeof onYtTick==='function')onYtTick(n,b._played,c,d);}catch(e){}},500);}
 async function ytToggle(n){const b=$(n);if(!b)return;hap('light');let p=YTP[n];if(!p){b.classList.add('loading');p=await ytMake(n);b.classList.remove('loading');return;}
  try{const s=p.getPlayerState();if(s===1)p.pauseVideo();else{if(s===0)p.seekTo(0,true);p.playVideo();}}catch(e){}}
+function ytMuteSet(n){const b=$(n),p=YTP[n];if(!b||!p||!b.classList.contains('reel'))return;try{RL_MUTE?p.mute():p.unMute();}catch(e){}}
+/* reels: koʻrinishga kirganda avtomatik (ovozsiz rejimda — ovozsiz) */
+async function ytAuto(n){const b=$(n);if(!b)return;document.querySelectorAll('#reels .ytb').forEach(o=>{if(o.id!==n)ytPause(o.id);});
+ const p=YTP[n];if(p){ytMuteSet(n);try{if(p.getPlayerState()!==1)p.playVideo();}catch(e){}return;}b.classList.add('loading');await ytMake(n);b.classList.remove('loading');}
 function ytPause(n){const p=YTP[n];try{if(p&&p.getPlayerState()===1)p.pauseVideo();}catch(e){}}
 function ytSeek(n,v){const p=YTP[n];if(!p)return;try{p.seekTo((p.getDuration()||0)*v/1000,true);}catch(e){}}
 function ytFull(n){const b=$(n);if(!b)return;const on=!b.classList.contains('fs');b.classList.toggle('fs',on);b.classList.toggle('rot',on&&innerHeight>innerWidth);document.body.classList.toggle('ytfs',on);
@@ -1404,10 +1429,11 @@ async function openNotes(){hap('light');pushNav();SUB='notes';NOTES=null;render(
 function noteRow(n){const who=`<b>${esc(n.name||'')}</b>`;let ic='🔔',t='';
  if(n.t==='follow'){ic='👤';t=`${who} ${T('sizga obuna boʻldi')}${n.n?` · +${n.n} ${T('dinor')}`:''}`;}
  else if(n.t==='like'){ic='❤️';t=`${who} ${T('postingizni yoqtirdi')}`;}
+ else if(n.t==='wall'){ic='📝';t=`${who} ${T('profilingizga izoh yozdi')}: «${esc(n.text||'')}»`;}
  else if(n.t==='cmt'){ic='💬';t=`${who} ${T('izoh qoldirdi')}: «${esc(n.text||'')}»`;}
  else if(n.t==='react'){ic=n.e||'👍';t=`${who} ${T('xabaringizga reaksiya bildirdi')}`;}
  else if(n.t==='contest'){ic='🏆';t=`«${esc(n.name||'')}» — ${n.rank}-${T('oʻrin')}${n.n?` · +${n.n} ${T('dinor')}`:''}`;}
- const go=n.t==='follow'||n.t==='react'?`openProfile('${n.pid}')`:n.ref&&n.kind!=='comm'?`openPost('${n.ref}')`:n.t==='contest'?`openContest()`:'';
+ const go=n.t==='wall'?`openProfile(ME.user.pid)`:n.t==='follow'||n.t==='react'?`openProfile('${n.pid}')`:n.ref&&n.kind!=='comm'?`openPost('${n.ref}')`:n.t==='contest'?`openContest()`:'';
  return `<button class="nt-row" ${go?`onclick="${go}"`:''}><span class="nic">${ic}</span><span class="grow">${t}<small>${ago(n.at)}</small></span></button>`;}
 function notesView(){const N=NOTES;let h=`<div class="wrap">${backS()}<h2 class="tt">🔔 ${T('Bildirishnomalar')}</h2>`;if(!N)return h+spinH()+'</div>';
  if(!N.items.length)return h+`<div class="empty">${MS('sleep','','width:130px;height:130px;margin:0 auto')}<p>${T('Hozircha yangilik yoʻq')}</p></div></div>`;
